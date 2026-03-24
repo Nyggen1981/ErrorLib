@@ -160,7 +160,8 @@ const RATE_LIMIT_GAP_MS = 35_000;
 
 export async function extractAndSave(
   pages: { pageNumber: number; text: string }[],
-  manualId: string
+  manualId: string,
+  sourceUrl?: string
 ): Promise<number> {
   // Split pages into text chunks that fit the Gemini context window
   const chunks: { pageNumber: number; text: string }[][] = [];
@@ -248,6 +249,7 @@ export async function extractAndSave(
         0,
         5
       ),
+      sourceUrl,
     });
     log.detail(`    ${fc.code} - ${fc.title}`);
   }

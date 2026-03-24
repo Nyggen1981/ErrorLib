@@ -61,7 +61,8 @@ export async function upsertFaultCode(
   code: string,
   title: string,
   description: string,
-  fixSteps: string[]
+  fixSteps: string[],
+  sourceUrl?: string
 ) {
   const prisma = getPrisma();
 
@@ -72,11 +73,10 @@ export async function upsertFaultCode(
   if (existing) {
     return prisma.faultCode.update({
       where: { id: existing.id },
-      data: { title, description, fixSteps },
+      data: { title, description, fixSteps, ...(sourceUrl && { sourceUrl }) },
     });
   }
 
-  // Include manualId prefix to avoid slug collisions across manuals
   const baseSlug = slugify(`${code}-${title}`);
   let slug = baseSlug;
   let attempt = 0;
@@ -84,7 +84,7 @@ export async function upsertFaultCode(
   while (true) {
     try {
       return await prisma.faultCode.create({
-        data: { code, slug, title, description, fixSteps, manualId },
+        data: { code, slug, title, description, fixSteps, manualId, sourceUrl },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -128,6 +128,7 @@ type QueueItem = {
   title: string;
   description: string;
   fixSteps: string[];
+  sourceUrl?: string;
 };
 
 let _queue: QueueItem[] = [];
@@ -152,7 +153,8 @@ export async function flushDbQueue(): Promise<number> {
           item.code,
           item.title,
           item.description,
-          item.fixSteps
+          item.fixSteps,
+          item.sourceUrl
         );
         saved++;
       } catch (err) {

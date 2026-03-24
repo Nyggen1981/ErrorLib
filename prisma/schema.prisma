@@ -38,6 +38,7 @@ model FaultCode {
   title       String
   description String
   fixSteps    String[]
+  sourceUrl   String?
   manual      Manual   @relation(fields: [manualId], references: [id], onDelete: Cascade)
   manualId    String
   createdAt   DateTime @default(now())

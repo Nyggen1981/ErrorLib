@@ -389,7 +389,7 @@ async function mine(
 
     const manualStart = Date.now();
     try {
-      const count = await extractAndSave(pdf.pages, manual.id);
+      const count = await extractAndSave(pdf.pages, manual.id, pdf.url);
       grandTotal += count;
       const durMs = Date.now() - manualStart;
 
