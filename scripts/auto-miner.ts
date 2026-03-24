@@ -204,11 +204,13 @@ async function mine(
 
   const downloaded: { pdfPath: string; url: string; title: string }[] = [];
   let dupSkipped = 0;
+  let fileCounter = 0;
 
   for (const result of results) {
     if (downloaded.length >= MAX_PDFS) break;
 
-    const filename = `${brand.toLowerCase().replace(/\s+/g, "-")}_${downloaded.length + 1}.pdf`;
+    fileCounter++;
+    const filename = `${brand.toLowerCase().replace(/\s+/g, "-")}_${fileCounter}.pdf`;
 
     if (isAlreadyMined(filename, brand)) {
       log.info(`  [CACHE HIT] ${filename} already mined, skipping`);
