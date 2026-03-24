@@ -4,7 +4,7 @@ import { log } from "./lib/logger.js";
 import { searchManuals, extractManualName } from "./lib/search.js";
 import { downloadPdf, ensureTempDir } from "./lib/download.js";
 import { extractDiagnosticText } from "./lib/pdf-parser.js";
-import { extractAndSave } from "./lib/extract.js";
+import { extractAndSave, preflight } from "./lib/extract.js";
 import {
   upsertBrand,
   upsertManual,
@@ -61,6 +61,17 @@ function parseBrandArg(): string | null {
 async function mine(brand: string): Promise<number> {
   const startTime = Date.now();
   log.banner(`MINING RIG - ${brand.toUpperCase()}`);
+
+  // ─── PREFLIGHT: Check Gemini API ───
+  log.step("\u{2705}", "Preflight: checking Gemini API availability...");
+  const apiOk = await preflight();
+  if (!apiOk) {
+    log.error("Gemini API is rate-limited or quota exhausted. Try again later.");
+    log.info("Free tier resets per-minute (15 RPM) and daily (1,500 RPD).");
+    log.info("Wait a few minutes, or check https://aistudio.google.com/apikey");
+    return 0;
+  }
+  log.success("Gemini API is available");
 
   // ─── PHASE 1: SEARCH ───
   log.step("\u{1F310}", "PHASE 1: Searching for manuals...");

@@ -26,6 +26,22 @@ function getGemini(): GoogleGenerativeAI {
   return _genAI;
 }
 
+export async function preflight(): Promise<boolean> {
+  try {
+    const genAI = getGemini();
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const result = await model.generateContent("Reply with only the word OK");
+    const text = result.response.text().trim();
+    return text.length > 0;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED")) {
+      return false;
+    }
+    throw err;
+  }
+}
+
 const BATCH_PROMPT = `You are a senior industrial automation engineer analyzing extracted text from pages of an equipment manual.
 
 You are receiving text content from multiple pages of the SAME manual. Analyze ALL pages together and extract EVERY unique fault code, error code, or alarm code.
