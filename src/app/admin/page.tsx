@@ -22,6 +22,7 @@ export default async function AdminPage() {
     recentFaults,
     miningLogs,
     queueItems,
+    userRequests,
   ] = await Promise.all([
     prisma.brand.count(),
     prisma.manual.count(),
@@ -50,6 +51,10 @@ export default async function AdminPage() {
     }),
     prisma.miningQueue.findMany({
       orderBy: { createdAt: "asc" },
+    }),
+    prisma.userRequest.findMany({
+      orderBy: [{ voteCount: "desc" }, { createdAt: "desc" }],
+      take: 50,
     }),
   ]);
 
@@ -88,6 +93,15 @@ export default async function AdminPage() {
     createdAt: q.createdAt.toISOString(),
   }));
 
+  const userRequestData = userRequests.map((r) => ({
+    id: r.id,
+    brand: r.brand,
+    model: r.model,
+    status: r.status,
+    voteCount: r.voteCount,
+    createdAt: r.createdAt.toISOString(),
+  }));
+
   return (
     <AdminDashboard
       stats={{ brandCount, manualCount, faultCount }}
@@ -95,6 +109,7 @@ export default async function AdminPage() {
       recentActivity={recentActivity}
       miningLogs={miningLogData}
       queue={queueData}
+      userRequests={userRequestData}
     />
   );
 }

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { RequestForm } from "./request-form";
 
 export const dynamic = "force-dynamic";
 
@@ -139,6 +140,8 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      <RequestForm />
     </>
   );
 }

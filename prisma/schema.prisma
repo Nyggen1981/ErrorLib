@@ -71,3 +71,15 @@ model MiningQueue {
   @@index([status])
   @@index([createdAt])
 }
+
+model UserRequest {
+  id        String   @id @default(cuid())
+  brand     String
+  model     String?
+  status    String   @default("pending")
+  voteCount Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@index([voteCount])
+}

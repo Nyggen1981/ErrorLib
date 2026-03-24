@@ -22,6 +22,15 @@ type QueueEntry = {
   createdAt: string;
 };
 
+type UserRequestEntry = {
+  id: string;
+  brand: string;
+  model: string | null;
+  status: string;
+  voteCount: number;
+  createdAt: string;
+};
+
 type Props = {
   stats: {
     brandCount: number;
@@ -44,6 +53,7 @@ type Props = {
   }[];
   miningLogs: MiningLogEntry[];
   queue: QueueEntry[];
+  userRequests: UserRequestEntry[];
 };
 
 function StatCard({
@@ -263,12 +273,174 @@ function MiningQueuePanel({ initialQueue }: { initialQueue: QueueEntry[] }) {
   );
 }
 
+function UserRequestsPanel({
+  initialRequests,
+}: {
+  initialRequests: UserRequestEntry[];
+}) {
+  const [requests, setRequests] =
+    useState<UserRequestEntry[]>(initialRequests);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function refresh() {
+    try {
+      const res = await fetch("/api/admin/requests");
+      if (res.ok) {
+        const data = await res.json();
+        setRequests(data.requests);
+      }
+    } catch {}
+  }
+
+  async function handleAction(id: string, action: "approve" | "reject") {
+    setBusy(id);
+    try {
+      const res = await fetch("/api/admin/requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action }),
+      });
+      if (res.ok) await refresh();
+    } catch {}
+    setBusy(null);
+  }
+
+  async function handleDelete(id: string) {
+    setBusy(id);
+    try {
+      const res = await fetch(`/api/admin/requests?id=${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setRequests((prev) => prev.filter((r) => r.id !== id));
+      }
+    } catch {}
+    setBusy(null);
+  }
+
+  const pending = requests.filter((r) => r.status === "pending");
+  const handled = requests.filter((r) => r.status !== "pending");
+
+  const reqBadge = (status: string) => {
+    const s: Record<string, string> = {
+      pending: "bg-warning/20 text-warning",
+      approved: "bg-success/20 text-success",
+      rejected: "bg-danger/20 text-danger",
+    };
+    return (
+      <span
+        className={`rounded-full px-2 py-0.5 text-xs font-medium ${s[status] ?? "bg-technical-600 text-technical-300"}`}
+      >
+        {status}
+      </span>
+    );
+  };
+
+  return (
+    <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-white">User Requests</h2>
+        <span className="rounded-full bg-warning/20 px-2.5 py-0.5 text-xs font-medium text-warning">
+          {pending.length} pending
+        </span>
+      </div>
+
+      {pending.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-technical-700 text-technical-400">
+                <th className="pb-3 pr-4 font-medium">Brand</th>
+                <th className="pb-3 pr-4 font-medium">Model</th>
+                <th className="pb-3 pr-4 font-medium text-right">Votes</th>
+                <th className="pb-3 pr-4 font-medium">When</th>
+                <th className="pb-3 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-technical-700/50">
+              {pending.map((r) => (
+                <tr key={r.id} className="text-technical-300">
+                  <td className="py-3 pr-4 font-medium text-technical-200">
+                    {r.brand}
+                  </td>
+                  <td className="py-3 pr-4 text-technical-400">
+                    {r.model || "—"}
+                  </td>
+                  <td className="py-3 pr-4 text-right">
+                    <span className="rounded-full bg-accent/20 px-2 py-0.5 text-xs font-semibold text-accent tabular-nums">
+                      {r.voteCount}
+                    </span>
+                  </td>
+                  <td className="py-3 pr-4 whitespace-nowrap text-technical-500">
+                    {timeAgo(r.createdAt)}
+                  </td>
+                  <td className="py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleAction(r.id, "approve")}
+                        disabled={busy === r.id}
+                        className="rounded px-2.5 py-1 text-xs font-medium text-success transition hover:bg-success/20 disabled:opacity-50"
+                      >
+                        Approve & Mine
+                      </button>
+                      <button
+                        onClick={() => handleAction(r.id, "reject")}
+                        disabled={busy === r.id}
+                        className="rounded px-2.5 py-1 text-xs text-danger transition hover:bg-danger/20 disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-sm text-technical-500">No pending requests.</p>
+      )}
+
+      {handled.length > 0 && (
+        <div className="mt-4 border-t border-technical-700 pt-3">
+          <p className="mb-2 text-xs font-medium text-technical-400">
+            History
+          </p>
+          <div className="space-y-1.5">
+            {handled.slice(0, 8).map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center justify-between text-sm"
+              >
+                <div className="flex items-center gap-2">
+                  {reqBadge(r.status)}
+                  <span className="text-technical-400">
+                    {r.brand}
+                    {r.model ? ` / ${r.model}` : ""}
+                  </span>
+                </div>
+                <button
+                  onClick={() => handleDelete(r.id)}
+                  className="text-xs text-technical-500 transition hover:text-danger"
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AdminDashboard({
   stats,
   brandStats,
   recentActivity,
   miningLogs,
   queue,
+  userRequests,
 }: Props) {
   const router = useRouter();
 
@@ -324,9 +496,10 @@ export function AdminDashboard({
         />
       </div>
 
-      {/* Mining Queue — full width */}
-      <div className="mb-8">
+      {/* Mining Queue + User Requests — side by side */}
+      <div className="mb-8 grid gap-8 lg:grid-cols-2">
         <MiningQueuePanel initialQueue={queue} />
+        <UserRequestsPanel initialRequests={userRequests} />
       </div>
 
       {/* Mining Log — full width */}
