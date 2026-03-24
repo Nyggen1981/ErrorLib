@@ -6,6 +6,11 @@ import type { Metadata } from "next";
 
 type Props = { params: Promise<{ brandSlug: string; manualSlug: string }> };
 
+function stripBrand(manualName: string, brandName: string): string {
+  const re = new RegExp(`^${brandName}\\s+`, "i");
+  return manualName.replace(re, "");
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { brandSlug, manualSlug } = await params;
   const manual = await prisma.manual.findUnique({
@@ -13,9 +18,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     include: { brand: true },
   });
   if (!manual || manual.brand.slug !== brandSlug) return {};
+  const display = stripBrand(manual.name, manual.brand.name);
   return {
-    title: `${manual.brand.name} ${manual.name} - All Fault Codes`,
-    description: `Complete list of fault codes for the ${manual.brand.name} ${manual.name}. Step-by-step troubleshooting guides for every error.`,
+    title: `${manual.brand.name} ${display} - All Fault Codes`,
+    description: `Complete list of fault codes for the ${manual.brand.name} ${display}. Step-by-step troubleshooting guides for every error.`,
   };
 }
 
@@ -31,19 +37,21 @@ export default async function ManualPage({ params }: Props) {
 
   if (!manual || manual.brand.slug !== brandSlug) notFound();
 
+  const displayName = stripBrand(manual.name, manual.brand.name);
+
   return (
     <>
       <Breadcrumbs
         items={[
           { label: "Home", href: "/" },
           { label: manual.brand.name, href: `/${manual.brand.slug}` },
-          { label: manual.name },
+          { label: displayName },
         ]}
       />
 
       <div className="mb-10">
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          {manual.brand.name} {manual.name}
+          {manual.brand.name} {displayName}
         </h1>
         <p className="mt-3 text-lg text-technical-500">
           {manual.faultCodes.length} fault{" "}

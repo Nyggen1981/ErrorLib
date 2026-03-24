@@ -11,6 +11,11 @@ type Props = {
   }>;
 };
 
+function stripBrand(manualName: string, brandName: string): string {
+  const re = new RegExp(`^${brandName}\\s+`, "i");
+  return manualName.replace(re, "");
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { brandSlug, manualSlug, faultSlug } = await params;
   const fault = await prisma.faultCode.findUnique({
@@ -24,7 +29,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   )
     return {};
 
-  const title = `How to fix ${fault.manual.brand.name} ${fault.manual.name} ${fault.code} - ${fault.title}`;
+  const display = stripBrand(fault.manual.name, fault.manual.brand.name);
+  const title = `How to fix ${fault.manual.brand.name} ${display} ${fault.code} - ${fault.title}`;
   return {
     title,
     description: fault.description.slice(0, 160),
@@ -52,6 +58,7 @@ export default async function FaultCodePage({ params }: Props) {
 
   const fixSteps = fault.fixSteps;
   const prioritySteps = fixSteps.slice(0, 3);
+  const displayName = stripBrand(fault.manual.name, fault.manual.brand.name);
 
   return (
     <>
@@ -63,7 +70,7 @@ export default async function FaultCodePage({ params }: Props) {
             href: `/${fault.manual.brand.slug}`,
           },
           {
-            label: fault.manual.name,
+            label: displayName,
             href: `/${fault.manual.brand.slug}/${fault.manual.slug}`,
           },
           { label: fault.code },
@@ -91,7 +98,7 @@ export default async function FaultCodePage({ params }: Props) {
               {fault.title}
             </h1>
             <p className="mt-1 text-sm text-technical-400">
-              {fault.manual.brand.name} &middot; {fault.manual.name}
+              {fault.manual.brand.name} &middot; {displayName}
             </p>
           </div>
         </div>
