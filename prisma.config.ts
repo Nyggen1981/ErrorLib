@@ -1,9 +1,5 @@
 import { defineConfig } from "prisma/config";
 
-try {
-  await import("dotenv/config");
-} catch {}
-
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
