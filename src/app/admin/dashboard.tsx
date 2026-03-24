@@ -93,10 +93,12 @@ function statusBadge(status: string) {
     failed: "bg-danger/20 text-danger",
     started: "bg-accent/20 text-accent animate-pulse",
     skipped: "bg-technical-500/20 text-technical-400",
+    aborted: "bg-danger/10 text-technical-400",
   };
   const labels: Record<string, string> = {
     started: "in progress",
     skipped: "skipped",
+    aborted: "aborted",
   };
   return (
     <span

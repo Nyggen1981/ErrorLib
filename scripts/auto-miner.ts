@@ -120,10 +120,16 @@ async function fetchQueueBrands(): Promise<
 > {
   const prisma = getPrisma();
 
-  // Reset stale "processing" items from interrupted runs back to pending
+  // Reset stale "processing" queue items from interrupted runs
   await prisma.miningQueue.updateMany({
     where: { status: "processing" },
     data: { status: "pending" },
+  });
+
+  // Mark stale "started" mining logs as aborted
+  await prisma.miningLog.updateMany({
+    where: { status: "started" },
+    data: { status: "aborted", message: "Miner was interrupted" },
   });
 
   return prisma.miningQueue.findMany({

@@ -14,6 +14,13 @@ export default async function AdminPage() {
   const authed = await isAdminAuthenticated();
   if (!authed) redirect("/admin/login");
 
+  // Mark stale "started" mining logs as aborted (from interrupted runs)
+  const fiveMinAgo = new Date(Date.now() - 5 * 60_000);
+  await prisma.miningLog.updateMany({
+    where: { status: "started", createdAt: { lt: fiveMinAgo } },
+    data: { status: "aborted", message: "Miner was interrupted" },
+  });
+
   const [
     brandCount,
     manualCount,
