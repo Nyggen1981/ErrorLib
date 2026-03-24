@@ -9,12 +9,12 @@ const COMING_SOON_BRANDS = [
   { name: "Yaskawa", category: "AC Drives" },
   { name: "Rockwell / Allen-Bradley", category: "PowerFlex Drives" },
   { name: "Lenze", category: "Servo & Frequency Inverters" },
+  { name: "Siemens", category: "SINAMICS & SIMATIC Drives" },
 ];
 
 export default async function HomePage() {
   const brands = await prisma.brand.findMany({
     include: {
-      _count: { select: { manuals: true } },
       manuals: {
         include: { _count: { select: { faultCodes: true } } },
       },
@@ -32,12 +32,26 @@ export default async function HomePage() {
   }));
 
   const activeBrands = brandsWithStats.filter((b) => b.totalFaultCodes > 0);
-  const pendingBrands = brandsWithStats.filter((b) => b.totalFaultCodes === 0);
 
-  const existingSlugs = new Set(brands.map((b) => b.name.toLowerCase()));
-  const comingSoon = COMING_SOON_BRANDS.filter(
-    (b) => !existingSlugs.has(b.name.toLowerCase())
+  const emptyDbNames = new Set(
+    brandsWithStats
+      .filter((b) => b.totalFaultCodes === 0)
+      .map((b) => b.name.toLowerCase())
   );
+  const activeNames = new Set(activeBrands.map((b) => b.name.toLowerCase()));
+
+  const comingSoon = COMING_SOON_BRANDS.filter(
+    (b) => !activeNames.has(b.name.toLowerCase())
+  );
+
+  for (const b of brandsWithStats) {
+    if (
+      b.totalFaultCodes === 0 &&
+      !comingSoon.some((c) => c.name.toLowerCase() === b.name.toLowerCase())
+    ) {
+      comingSoon.push({ name: b.name, category: "Industrial Equipment" });
+    }
+  }
 
   return (
     <>
@@ -51,7 +65,7 @@ export default async function HomePage() {
         </p>
       </div>
 
-      {activeBrands.length === 0 && pendingBrands.length === 0 ? (
+      {activeBrands.length === 0 ? (
         <div className="rounded-xl border border-dashed border-technical-300 bg-white p-12 text-center">
           <p className="text-technical-400">
             No brands yet. Run the mining rig to populate the database.
@@ -82,20 +96,6 @@ export default async function HomePage() {
                 </span>
               </div>
             </a>
-          ))}
-
-          {pendingBrands.map((brand) => (
-            <div
-              key={brand.id}
-              className="rounded-xl border border-dashed border-technical-200 bg-white/60 p-6"
-            >
-              <h2 className="text-xl font-semibold text-technical-400">
-                {brand.name}
-              </h2>
-              <p className="mt-2 text-sm text-technical-300">
-                Extraction in progress...
-              </p>
-            </div>
           ))}
         </div>
       )}

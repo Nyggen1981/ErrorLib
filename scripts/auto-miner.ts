@@ -1,12 +1,17 @@
 import "dotenv/config";
 import path from "path";
-import fs from "fs";
 import { log } from "./lib/logger.js";
 import { searchManuals, extractManualName } from "./lib/search.js";
 import { downloadPdf, ensureTempDir } from "./lib/download.js";
-import { extractDiagnosticPages } from "./lib/pdf-parser.js";
+import { extractDiagnosticText } from "./lib/pdf-parser.js";
 import { extractAndSave } from "./lib/extract.js";
 import { upsertBrand, upsertManual, disconnect, getPrisma } from "./lib/db.js";
+import {
+  isAlreadyMined,
+  markCompleted,
+  markFailed,
+  getCacheStats,
+} from "./lib/cache.js";
 
 const MAX_PDFS = 5;
 const MAX_PAGES_PER_PDF = 40;
@@ -76,6 +81,12 @@ async function mine(brand: string): Promise<number> {
     if (downloaded.length >= MAX_PDFS) break;
 
     const filename = `${brand.toLowerCase().replace(/\s+/g, "-")}_${downloaded.length + 1}.pdf`;
+
+    if (isAlreadyMined(filename, brand)) {
+      log.info(`  [CACHE HIT] ${filename} already mined, skipping`);
+      continue;
+    }
+
     const pdfPath = await downloadPdf(result.link, filename);
     if (pdfPath) {
       downloaded.push({
@@ -87,74 +98,71 @@ async function mine(brand: string): Promise<number> {
   }
 
   if (downloaded.length === 0) {
-    log.error("Could not download any PDFs. Skipping this brand.");
+    log.info("All PDFs already mined (or none downloadable). Nothing to do.");
     return 0;
   }
 
-  log.info(`Downloaded ${downloaded.length} PDFs successfully`);
+  log.info(`Downloaded ${downloaded.length} new PDFs to process`);
 
-  // ─── PHASE 3: SCAN & CONVERT ───
-  log.step("\u{1F9E0}", "PHASE 3: Scanning for diagnostic pages...");
-  const imageDir = path.join(ensureTempDir(), "images");
-  fs.mkdirSync(imageDir, { recursive: true });
+  // ─── PHASE 3: SCAN & EXTRACT TEXT ───
+  log.step("\u{1F9E0}", "PHASE 3: Scanning for diagnostic pages (text extraction)...");
 
-  const pdfImages: {
+  const pdfTexts: {
     pdfPath: string;
     url: string;
     title: string;
-    images: string[];
+    filename: string;
+    pages: { pageNumber: number; text: string }[];
   }[] = [];
 
   for (const dl of downloaded) {
-    const pages = await extractDiagnosticPages(
-      dl.pdfPath,
-      imageDir,
-      MAX_PAGES_PER_PDF
-    );
+    const pages = await extractDiagnosticText(dl.pdfPath, MAX_PAGES_PER_PDF);
     if (pages.length > 0) {
-      pdfImages.push({
+      pdfTexts.push({
         ...dl,
-        images: pages.map((p) => p.imagePath),
+        filename: path.basename(dl.pdfPath),
+        pages,
       });
     }
   }
 
-  const totalImages = pdfImages.reduce((n, p) => n + p.images.length, 0);
-  if (totalImages === 0) {
+  const totalPages = pdfTexts.reduce((n, p) => n + p.pages.length, 0);
+  if (totalPages === 0) {
     log.error("No diagnostic pages found in any PDFs. Skipping this brand.");
     return 0;
   }
 
   log.info(
-    `Extracted ${totalImages} diagnostic page images from ${pdfImages.length} PDFs`
+    `Extracted text from ${totalPages} diagnostic pages across ${pdfTexts.length} PDFs`
   );
 
   // ─── PHASE 4: AI EXTRACTION ───
-  log.step("\u{1F916}", "PHASE 4: Extracting fault codes with Gemini...");
+  log.step("\u{1F916}", "PHASE 4: Extracting fault codes with Gemini (text mode)...");
 
   const brandRecord = await upsertBrand(brand);
   let grandTotal = 0;
 
-  for (const pdf of pdfImages) {
+  for (const pdf of pdfTexts) {
     const manualName = await extractManualName(pdf.title, pdf.url, brand);
-    log.info(`Processing manual: ${manualName} (${pdf.images.length} pages)`);
+    log.info(`Processing manual: ${manualName} (${pdf.pages.length} pages)`);
 
     const manual = await upsertManual(brandRecord.id, manualName, pdf.url);
-    const count = await extractAndSave(pdf.images, manual.id);
-    grandTotal += count;
 
-    if (count > 0) {
-      console.log(
-        `[LIVE UPDATE] Pushing ${count} codes to Neon for "${manualName}"...`
-      );
+    try {
+      const count = await extractAndSave(pdf.pages, manual.id);
+      grandTotal += count;
+
+      markCompleted(pdf.filename, pdf.url, brand, count);
+      log.success(`  -> ${count} fault codes extracted from ${manualName}`);
+    } catch (err) {
+      markFailed(pdf.filename, pdf.url, brand);
+      throw err;
     }
-
-    log.success(`  -> ${count} fault codes extracted from ${manualName}`);
   }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   log.success(
-    `${brand} complete: ${grandTotal} codes from ${pdfImages.length} manuals in ${elapsed}s`
+    `${brand} complete: ${grandTotal} codes from ${pdfTexts.length} manuals in ${elapsed}s`
   );
 
   return grandTotal;
@@ -199,8 +207,7 @@ async function mineWithRetry(
 async function main() {
   const singleBrand = parseBrandArg();
 
-  const brands =
-    singleBrand !== null ? [singleBrand] : AUTO_BRANDS;
+  const brands = singleBrand !== null ? [singleBrand] : AUTO_BRANDS;
 
   if (brands.length === 0 || (brands.length === 1 && !brands[0])) {
     console.log(`
@@ -218,11 +225,13 @@ Brands in the auto queue: ${AUTO_BRANDS.join(", ")}
   let totalCodes = 0;
   const results: { brand: string; codes: number; status: string }[] = [];
 
+  const cacheStats = getCacheStats();
   log.banner(
     brands.length === 1
       ? `MINING: ${brands[0]}`
       : `AUTONOMOUS MINING: ${brands.length} BRANDS`
   );
+  log.info(`Cache: ${cacheStats.completed} manuals already mined`);
 
   if (brands.length > 1) {
     log.info(`Queue: ${brands.join(" -> ")}`);
@@ -239,7 +248,11 @@ Brands in the auto queue: ${AUTO_BRANDS.join(", ")}
     try {
       const count = await mineWithRetry(brand);
       totalCodes += count;
-      results.push({ brand, codes: count, status: count > 0 ? "OK" : "EMPTY" });
+      results.push({
+        brand,
+        codes: count,
+        status: count > 0 ? "OK" : "EMPTY",
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       log.error(`Fatal error mining ${brand}: ${msg}`);
@@ -260,18 +273,26 @@ Brands in the auto queue: ${AUTO_BRANDS.join(", ")}
   const dbManuals = await prisma.manual.count();
   const dbFaults = await prisma.faultCode.count();
   const elapsed = ((Date.now() - globalStart) / 1000).toFixed(1);
+  const finalCache = getCacheStats();
 
   log.banner("AUTONOMOUS MINING COMPLETE");
   log.info("");
   log.info("Results per brand:");
   for (const r of results) {
     const icon =
-      r.status === "OK" ? "\u2705" : r.status === "EMPTY" ? "\u26A0\uFE0F" : "\u274C";
-    log.info(`  ${icon} ${r.brand.padEnd(22)} ${r.codes} codes  [${r.status}]`);
+      r.status === "OK"
+        ? "\u2705"
+        : r.status === "EMPTY"
+          ? "\u26A0\uFE0F"
+          : "\u274C";
+    log.info(
+      `  ${icon} ${r.brand.padEnd(22)} ${r.codes} codes  [${r.status}]`
+    );
   }
   log.info("");
   log.success(`Total new codes:  ${totalCodes}`);
   log.success(`Time elapsed:     ${elapsed}s`);
+  log.success(`Cached manuals:   ${finalCache.completed}`);
   log.info("");
   log.info("Database totals:");
   log.info(`  Brands:      ${dbBrands}`);

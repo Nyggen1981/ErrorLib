@@ -32,9 +32,6 @@ export default async function BrandPage({ params }: Props) {
   const manualsWithCodes = brand.manuals.filter(
     (m) => m._count.faultCodes > 0
   );
-  const emptyManuals = brand.manuals.filter(
-    (m) => m._count.faultCodes === 0
-  );
 
   return (
     <>
@@ -48,8 +45,8 @@ export default async function BrandPage({ params }: Props) {
         </h1>
         <p className="mt-3 text-lg text-technical-500">
           {manualsWithCodes.length > 0
-            ? "Select a manual to view its fault codes and troubleshooting guides."
-            : "Manuals are being processed. Check back soon for fault codes."}
+            ? `${manualsWithCodes.length} ${manualsWithCodes.length === 1 ? "manual" : "manuals"} with fault code documentation.`
+            : "No fault codes available yet. Check back soon."}
         </p>
       </div>
 
@@ -73,47 +70,12 @@ export default async function BrandPage({ params }: Props) {
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-technical-300 bg-white p-12 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-technical-100">
-            <svg
-              className="h-6 w-6 text-technical-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
           <p className="text-technical-500">
-            Fault codes are being extracted from {brand.name} manuals.
+            No fault codes have been extracted for {brand.name} yet.
           </p>
           <p className="mt-1 text-sm text-technical-400">
-            Run the mining rig to populate this section.
+            This brand is in the mining queue.
           </p>
-        </div>
-      )}
-
-      {emptyManuals.length > 0 && manualsWithCodes.length > 0 && (
-        <div className="mt-8">
-          <p className="mb-3 text-sm font-medium text-technical-400">
-            Processing ({emptyManuals.length} more{" "}
-            {emptyManuals.length === 1 ? "manual" : "manuals"} pending
-            extraction)
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {emptyManuals.map((m) => (
-              <span
-                key={m.id}
-                className="rounded-full bg-technical-100 px-3 py-1 text-xs text-technical-400"
-              >
-                {m.name}
-              </span>
-            ))}
-          </div>
         </div>
       )}
     </>

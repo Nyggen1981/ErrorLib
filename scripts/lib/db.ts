@@ -63,10 +63,20 @@ export async function upsertFaultCode(
 ) {
   const prisma = getPrisma();
   const slug = slugify(`${code}-${title}`);
-  return prisma.faultCode.upsert({
-    where: { slug },
-    update: { title, description, fixSteps },
-    create: {
+
+  const existing = await prisma.faultCode.findFirst({
+    where: { code, manualId },
+  });
+
+  if (existing) {
+    return prisma.faultCode.update({
+      where: { id: existing.id },
+      data: { title, description, fixSteps },
+    });
+  }
+
+  return prisma.faultCode.create({
+    data: {
       code,
       slug,
       title,
