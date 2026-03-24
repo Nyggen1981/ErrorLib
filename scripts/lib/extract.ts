@@ -95,7 +95,7 @@ async function callGeminiBatch(
         msg.includes("quota") ||
         msg.includes("Too Many Requests")
       ) {
-        const retryAfter = parseRetryDelay(msg) ?? 30 * (attempt + 1);
+        const retryAfter = parseRetryDelay(msg) ?? 60 * (attempt + 1);
         if (attempt < maxRetries) {
           log.warn(
             `  Rate limited. Waiting ${retryAfter}s before retry ${attempt + 1}/${maxRetries}...`
