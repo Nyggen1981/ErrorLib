@@ -49,7 +49,7 @@ function extractModelFamily(cleanedTitle: string): string {
   const family: string[] = [];
 
   for (const word of words) {
-    if (family.length >= 3) break;
+    if (family.length >= 2) break;
     if (/^[A-Z0-9]/.test(word) && word.length >= 2) {
       family.push(word);
     } else if (family.length > 0) {
@@ -59,6 +59,14 @@ function extractModelFamily(cleanedTitle: string): string {
 
   if (family.length === 0) return cleanedTitle.split(/\s+/).slice(0, 2).join(" ");
   return family.join(" ");
+}
+
+function variantLabel(cleanedTitle: string, family: string): string {
+  return cleanedTitle
+    .replace(family, "")
+    .replace(/^[\s,\-–—]+/, "")
+    .replace(/[\s,\-–—]+$/, "")
+    .trim();
 }
 
 type ManualWithCount = {
@@ -72,7 +80,7 @@ type ModelGroup = {
   family: string;
   manuals: ManualWithCount[];
   totalCodes: number;
-  cleanTitles: string[];
+  variants: string[];
 };
 
 function groupManuals(
@@ -86,27 +94,26 @@ function groupManuals(
 
     const cleaned = cleanTitle(manual.name, brandName);
     const family = extractModelFamily(cleaned);
+    const variant = variantLabel(cleaned, family);
 
     const existing = groups.get(family);
     if (existing) {
       existing.manuals.push(manual);
       existing.totalCodes += manual._count.faultCodes;
-      if (!existing.cleanTitles.includes(cleaned)) {
-        existing.cleanTitles.push(cleaned);
+      if (variant && !existing.variants.includes(variant)) {
+        existing.variants.push(variant);
       }
     } else {
       groups.set(family, {
         family,
         manuals: [manual],
         totalCodes: manual._count.faultCodes,
-        cleanTitles: [cleaned],
+        variants: variant ? [variant] : [],
       });
     }
   }
 
-  return Array.from(groups.values()).sort((a, b) =>
-    a.family.localeCompare(b.family)
-  );
+  return Array.from(groups.values()).sort((a, b) => b.totalCodes - a.totalCodes);
 }
 
 export default async function BrandPage({ params }: Props) {
@@ -149,49 +156,42 @@ export default async function BrandPage({ params }: Props) {
             const primary = group.manuals.reduce((best, m) =>
               m._count.faultCodes > best._count.faultCodes ? m : best
             );
+            const manualCount = group.manuals.length;
+            const hasVariants = group.variants.length > 0;
 
             return (
-              <div
+              <a
                 key={group.family}
-                className="group rounded-xl border border-technical-200 bg-white p-6 transition-all hover:border-technical-300 hover:shadow-md"
+                href={`/${brand.slug}/${primary.slug}`}
+                className="group flex flex-col rounded-xl border border-technical-200 bg-white p-6 transition-all hover:border-technical-300 hover:shadow-md"
               >
-                <a
-                  href={`/${brand.slug}/${primary.slug}`}
-                  className="block"
-                >
+                <div className="flex items-start justify-between gap-3">
                   <h2 className="text-xl font-bold tracking-tight group-hover:text-accent transition-colors">
                     {group.family}
                   </h2>
-                  <p className="mt-1 text-sm font-medium text-technical-600">
-                    {group.totalCodes} fault{" "}
-                    {group.totalCodes === 1 ? "code" : "codes"}
-                  </p>
-                </a>
+                  {manualCount > 1 && (
+                    <span className="shrink-0 rounded-full bg-technical-100 px-2.5 py-0.5 text-xs font-medium text-technical-600">
+                      {manualCount} manuals
+                    </span>
+                  )}
+                </div>
 
-                {group.manuals.length > 1 && (
-                  <div className="mt-3 border-t border-technical-100 pt-3">
-                    <p className="mb-2 text-xs text-technical-400">
-                      From {group.manuals.length} manuals:
-                    </p>
-                    <div className="space-y-1">
-                      {group.manuals.map((m) => (
-                        <a
-                          key={m.id}
-                          href={`/${brand.slug}/${m.slug}`}
-                          className="flex items-center justify-between rounded px-2 py-1 text-xs transition hover:bg-technical-50"
-                        >
-                          <span className="truncate text-technical-500 hover:text-accent">
-                            {cleanTitle(m.name, brand.name)}
-                          </span>
-                          <span className="ml-2 shrink-0 tabular-nums text-technical-400">
-                            {m._count.faultCodes}
-                          </span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
+                <p className="mt-2 text-lg font-semibold tabular-nums text-technical-700">
+                  {group.totalCodes}{" "}
+                  <span className="text-sm font-normal text-technical-400">
+                    fault {group.totalCodes === 1 ? "code" : "codes"}
+                  </span>
+                </p>
+
+                {hasVariants && (
+                  <p className="mt-2 text-xs text-technical-400">
+                    Includes {group.variants.slice(0, 4).join(", ")}
+                    {group.variants.length > 4
+                      ? ` +${group.variants.length - 4} more`
+                      : ""}
+                  </p>
                 )}
-              </div>
+              </a>
             );
           })}
         </div>
