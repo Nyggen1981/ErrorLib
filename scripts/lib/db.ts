@@ -1,5 +1,6 @@
 import { PrismaClient } from "../../generated/prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
+import { log } from "./logger.js";
 
 let _prisma: PrismaClient | null = null;
 
@@ -14,6 +15,7 @@ export function getPrisma(): PrismaClient {
 }
 
 export async function disconnect() {
+  await flushDbQueue();
   if (_prisma) {
     await _prisma.$disconnect();
     _prisma = null;
@@ -85,4 +87,72 @@ export async function upsertFaultCode(
       manualId,
     },
   });
+}
+
+// ─── Mining Log ───
+
+export async function createMiningLog(entry: {
+  brand: string;
+  manual: string;
+  codesFound: number;
+  pagesUsed: number;
+  durationMs: number;
+  status: string;
+  message?: string;
+}) {
+  const prisma = getPrisma();
+  return prisma.miningLog.create({ data: entry });
+}
+
+// ─── Background DB Queue ───
+// Queues upsert work so Gemini calls are not blocked by DB round-trips.
+
+type QueueItem = {
+  manualId: string;
+  code: string;
+  title: string;
+  description: string;
+  fixSteps: string[];
+};
+
+let _queue: QueueItem[] = [];
+let _flushing: Promise<number> | null = null;
+
+export function enqueueFaultCode(item: QueueItem) {
+  _queue.push(item);
+}
+
+export async function flushDbQueue(): Promise<number> {
+  if (_flushing) await _flushing;
+
+  const items = _queue.splice(0);
+  if (items.length === 0) return 0;
+
+  _flushing = (async () => {
+    let saved = 0;
+    for (const item of items) {
+      try {
+        await upsertFaultCode(
+          item.manualId,
+          item.code,
+          item.title,
+          item.description,
+          item.fixSteps
+        );
+        saved++;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        log.warn(`  DB write failed for ${item.code}: ${msg.substring(0, 100)}`);
+      }
+    }
+    return saved;
+  })();
+
+  const count = await _flushing;
+  _flushing = null;
+  return count;
+}
+
+export function queueSize(): number {
+  return _queue.length;
 }

@@ -46,3 +46,18 @@ model FaultCode {
   @@index([manualId])
   @@index([code])
 }
+
+model MiningLog {
+  id         String   @id @default(cuid())
+  brand      String
+  manual     String
+  codesFound Int
+  pagesUsed  Int
+  durationMs Int
+  status     String
+  message    String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([brand])
+}

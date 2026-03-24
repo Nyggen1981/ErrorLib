@@ -5,7 +5,13 @@ import { searchManuals, extractManualName } from "./lib/search.js";
 import { downloadPdf, ensureTempDir } from "./lib/download.js";
 import { extractDiagnosticText } from "./lib/pdf-parser.js";
 import { extractAndSave } from "./lib/extract.js";
-import { upsertBrand, upsertManual, disconnect, getPrisma } from "./lib/db.js";
+import {
+  upsertBrand,
+  upsertManual,
+  disconnect,
+  getPrisma,
+  createMiningLog,
+} from "./lib/db.js";
 import {
   isAlreadyMined,
   markCompleted,
@@ -148,14 +154,39 @@ async function mine(brand: string): Promise<number> {
 
     const manual = await upsertManual(brandRecord.id, manualName, pdf.url);
 
+    const manualStart = Date.now();
     try {
       const count = await extractAndSave(pdf.pages, manual.id);
       grandTotal += count;
+      const durMs = Date.now() - manualStart;
 
       markCompleted(pdf.filename, pdf.url, brand, count);
-      log.success(`  -> ${count} fault codes extracted from ${manualName}`);
+
+      await createMiningLog({
+        brand,
+        manual: manualName,
+        codesFound: count,
+        pagesUsed: pdf.pages.length,
+        durationMs: durMs,
+        status: count > 0 ? "success" : "empty",
+        message: count > 0 ? `Extracted ${count} codes` : "No codes found",
+      }).catch(() => {});
+
+      log.success(`  -> ${count} fault codes from ${manualName} (${(durMs / 1000).toFixed(1)}s)`);
     } catch (err) {
+      const durMs = Date.now() - manualStart;
       markFailed(pdf.filename, pdf.url, brand);
+
+      await createMiningLog({
+        brand,
+        manual: manualName,
+        codesFound: 0,
+        pagesUsed: pdf.pages.length,
+        durationMs: durMs,
+        status: "failed",
+        message: err instanceof Error ? err.message.substring(0, 200) : "Unknown error",
+      }).catch(() => {});
+
       throw err;
     }
   }

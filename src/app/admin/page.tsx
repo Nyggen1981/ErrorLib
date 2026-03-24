@@ -14,30 +14,40 @@ export default async function AdminPage() {
   const authed = await isAdminAuthenticated();
   if (!authed) redirect("/admin/login");
 
-  const [brandCount, manualCount, faultCount, brands, recentFaults] =
-    await Promise.all([
-      prisma.brand.count(),
-      prisma.manual.count(),
-      prisma.faultCode.count(),
-      prisma.brand.findMany({
-        include: {
-          _count: { select: { manuals: true } },
-          manuals: {
-            include: { _count: { select: { faultCodes: true } } },
-          },
+  const [
+    brandCount,
+    manualCount,
+    faultCount,
+    brands,
+    recentFaults,
+    miningLogs,
+  ] = await Promise.all([
+    prisma.brand.count(),
+    prisma.manual.count(),
+    prisma.faultCode.count(),
+    prisma.brand.findMany({
+      include: {
+        _count: { select: { manuals: true } },
+        manuals: {
+          include: { _count: { select: { faultCodes: true } } },
         },
-        orderBy: { name: "asc" },
-      }),
-      prisma.faultCode.findMany({
-        take: 10,
-        orderBy: { createdAt: "desc" },
-        include: {
-          manual: {
-            include: { brand: true },
-          },
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.faultCode.findMany({
+      take: 10,
+      orderBy: { createdAt: "desc" },
+      include: {
+        manual: {
+          include: { brand: true },
         },
-      }),
-    ]);
+      },
+    }),
+    prisma.miningLog.findMany({
+      take: 20,
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
   const brandStats = brands.map((b) => ({
     name: b.name,
@@ -55,11 +65,24 @@ export default async function AdminPage() {
     createdAt: f.createdAt.toISOString(),
   }));
 
+  const miningLogData = miningLogs.map((l) => ({
+    id: l.id,
+    brand: l.brand,
+    manual: l.manual,
+    codesFound: l.codesFound,
+    pagesUsed: l.pagesUsed,
+    durationMs: l.durationMs,
+    status: l.status,
+    message: l.message,
+    createdAt: l.createdAt.toISOString(),
+  }));
+
   return (
     <AdminDashboard
       stats={{ brandCount, manualCount, faultCount }}
       brandStats={brandStats}
       recentActivity={recentActivity}
+      miningLogs={miningLogData}
     />
   );
 }

@@ -2,6 +2,18 @@
 
 import { useRouter } from "next/navigation";
 
+type MiningLogEntry = {
+  id: string;
+  brand: string;
+  manual: string;
+  codesFound: number;
+  pagesUsed: number;
+  durationMs: number;
+  status: string;
+  message: string | null;
+  createdAt: string;
+};
+
 type Props = {
   stats: {
     brandCount: number;
@@ -22,6 +34,7 @@ type Props = {
     manualName: string;
     createdAt: string;
   }[];
+  miningLogs: MiningLogEntry[];
 };
 
 function StatCard({
@@ -54,7 +67,27 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
-export function AdminDashboard({ stats, brandStats, recentActivity }: Props) {
+function statusBadge(status: string) {
+  const styles: Record<string, string> = {
+    success: "bg-success/20 text-success",
+    empty: "bg-warning/20 text-warning",
+    failed: "bg-danger/20 text-danger",
+  };
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] ?? "bg-technical-600 text-technical-300"}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+export function AdminDashboard({
+  stats,
+  brandStats,
+  recentActivity,
+  miningLogs,
+}: Props) {
   const router = useRouter();
 
   async function handleLogout() {
@@ -109,6 +142,77 @@ export function AdminDashboard({ stats, brandStats, recentActivity }: Props) {
         />
       </div>
 
+      {/* Mining Log — full width */}
+      <div className="mb-8">
+        <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
+          <h2 className="mb-4 text-lg font-semibold text-white">
+            Mining Log
+          </h2>
+          {miningLogs.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-technical-700 text-technical-400">
+                    <th className="pb-3 pr-4 font-medium">Status</th>
+                    <th className="pb-3 pr-4 font-medium">Brand</th>
+                    <th className="pb-3 pr-4 font-medium">Manual</th>
+                    <th className="pb-3 pr-4 font-medium text-right">
+                      Codes
+                    </th>
+                    <th className="pb-3 pr-4 font-medium text-right">
+                      Pages
+                    </th>
+                    <th className="pb-3 pr-4 font-medium text-right">
+                      Duration
+                    </th>
+                    <th className="pb-3 font-medium">When</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-technical-700/50">
+                  {miningLogs.map((entry) => (
+                    <tr key={entry.id} className="text-technical-300">
+                      <td className="py-3 pr-4">
+                        {statusBadge(entry.status)}
+                      </td>
+                      <td className="py-3 pr-4 whitespace-nowrap font-medium text-technical-200">
+                        {entry.brand}
+                      </td>
+                      <td className="py-3 pr-4 max-w-[220px] truncate text-technical-400">
+                        {entry.manual}
+                      </td>
+                      <td className="py-3 pr-4 text-right tabular-nums">
+                        <span
+                          className={
+                            entry.codesFound > 0
+                              ? "text-accent font-semibold"
+                              : "text-technical-500"
+                          }
+                        >
+                          {entry.codesFound}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4 text-right tabular-nums text-technical-500">
+                        {entry.pagesUsed}
+                      </td>
+                      <td className="py-3 pr-4 text-right tabular-nums text-technical-500">
+                        {(entry.durationMs / 1000).toFixed(1)}s
+                      </td>
+                      <td className="py-3 whitespace-nowrap text-technical-500">
+                        {timeAgo(entry.createdAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-technical-500">
+              No mining runs recorded yet. Run the miner to see logs here.
+            </p>
+          )}
+        </div>
+      </div>
+
       <div className="grid gap-8 lg:grid-cols-5">
         {/* Mining Status — left column */}
         <div className="lg:col-span-2">
@@ -160,7 +264,7 @@ export function AdminDashboard({ stats, brandStats, recentActivity }: Props) {
         <div className="lg:col-span-3">
           <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
             <h2 className="mb-4 text-lg font-semibold text-white">
-              Recent Activity
+              Recent Fault Codes
             </h2>
             {recentActivity.length > 0 ? (
               <div className="overflow-x-auto">

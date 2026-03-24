@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { log } from "./logger.js";
-import { upsertFaultCode } from "./db.js";
+import { enqueueFaultCode, flushDbQueue, queueSize } from "./db.js";
 
 export type ExtractedCode = {
   code: string;
@@ -117,20 +117,33 @@ function filterAndCap(codes: ExtractedCode[], max: number): ExtractedCode[] {
   return valid.slice(0, max);
 }
 
+function buildChunkText(
+  chunk: { pageNumber: number; text: string }[]
+): string {
+  return chunk
+    .map((p) => `--- Page ${p.pageNumber} ---\n${p.text}`)
+    .join("\n\n");
+}
+
 const MAX_CHARS_PER_REQUEST = 80_000;
 const MAX_CODES_PER_MANUAL = 60;
+const RATE_LIMIT_GAP_MS = 30_000;
 
 export async function extractAndSave(
   pages: { pageNumber: number; text: string }[],
   manualId: string
 ): Promise<number> {
+  // Split pages into text chunks that fit the Gemini context window
   const chunks: { pageNumber: number; text: string }[][] = [];
   let currentChunk: { pageNumber: number; text: string }[] = [];
   let currentLen = 0;
 
   for (const page of pages) {
     const pageLen = page.text.length + 30;
-    if (currentLen + pageLen > MAX_CHARS_PER_REQUEST && currentChunk.length > 0) {
+    if (
+      currentLen + pageLen > MAX_CHARS_PER_REQUEST &&
+      currentChunk.length > 0
+    ) {
       chunks.push(currentChunk);
       currentChunk = [];
       currentLen = 0;
@@ -142,21 +155,33 @@ export async function extractAndSave(
 
   let allCodes: ExtractedCode[] = [];
 
+  // Async pipeline: overlap Gemini wait + DB writes
+  // While waiting the 30s rate-limit gap, flush queued DB writes
+  let pendingDbFlush: Promise<number> | null = null;
+
   for (let c = 0; c < chunks.length; c++) {
     const chunk = chunks[c];
-    const chunkText = chunk
-      .map((p) => `--- Page ${p.pageNumber} ---\n${p.text}`)
-      .join("\n\n");
+    const chunkText = buildChunkText(chunk);
 
     const label =
       chunks.length === 1
-        ? `Sending ${chunk.length} pages to Gemini (text, ${(chunkText.length / 1000).toFixed(0)}k chars)...`
-        : `Sending batch ${c + 1}/${chunks.length} (${chunk.length} pages, ${(chunkText.length / 1000).toFixed(0)}k chars) to Gemini...`;
+        ? `Sending ${chunk.length} pages to Gemini (${(chunkText.length / 1000).toFixed(0)}k chars)...`
+        : `Batch ${c + 1}/${chunks.length} (${chunk.length} pages, ${(chunkText.length / 1000).toFixed(0)}k chars)...`;
     log.info(label);
 
     if (c > 0) {
-      log.detail("  Waiting 30s between batches...");
-      await sleep(30_000);
+      // Use the 30s rate-limit gap to flush any queued DB writes
+      log.detail(`  Rate-limit gap: flushing ${queueSize()} queued DB writes...`);
+      pendingDbFlush = flushDbQueue();
+      const flushAndWait = Promise.all([
+        pendingDbFlush,
+        sleep(RATE_LIMIT_GAP_MS),
+      ]);
+      const [flushed] = await flushAndWait;
+      if (flushed > 0) {
+        log.detail(`  Flushed ${flushed} codes to Neon during wait`);
+      }
+      pendingDbFlush = null;
     }
 
     try {
@@ -179,22 +204,30 @@ export async function extractAndSave(
 
   if (capped.length > 0) {
     console.log(
-      `[LIVE UPDATE] Pushing ${capped.length} codes to Neon...`
+      `[LIVE UPDATE] Queuing ${capped.length} codes for Neon push...`
     );
   }
 
-  let totalCodes = 0;
+  // Enqueue all codes for background DB write
   for (const fc of capped) {
-    await upsertFaultCode(
+    enqueueFaultCode({
       manualId,
-      fc.code,
-      fc.title,
-      fc.description || `Fault ${fc.code}`,
-      (fc.fixSteps || ["Refer to manufacturer documentation."]).slice(0, 5)
-    );
-    totalCodes++;
+      code: fc.code,
+      title: fc.title,
+      description: fc.description || `Fault ${fc.code}`,
+      fixSteps: (fc.fixSteps || ["Refer to manufacturer documentation."]).slice(
+        0,
+        5
+      ),
+    });
     log.detail(`    ${fc.code} - ${fc.title}`);
   }
 
-  return totalCodes;
+  // Final flush for this manual
+  const saved = await flushDbQueue();
+  if (saved > 0) {
+    log.success(`  Pushed ${saved} codes to Neon`);
+  }
+
+  return saved;
 }
