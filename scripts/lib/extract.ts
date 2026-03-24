@@ -86,10 +86,23 @@ async function callGeminiText(
       ) {
         const retryAfter = parseRetryDelay(msg) ?? 60 * (attempt + 1);
         if (attempt < maxRetries) {
-          log.warn(
-            `  Rate limited. Waiting ${retryAfter}s before retry ${attempt + 1}/${maxRetries}...`
-          );
-          await sleep(retryAfter * 1000);
+          const queued = queueSize();
+          if (queued > 0) {
+            log.warn(
+              `  Rate limited. Flushing ${queued} queued DB writes while waiting ${retryAfter}s (retry ${attempt + 1}/${maxRetries})...`
+            );
+          } else {
+            log.warn(
+              `  Rate limited. Waiting ${retryAfter}s before retry ${attempt + 1}/${maxRetries}...`
+            );
+          }
+          const [flushed] = await Promise.all([
+            flushDbQueue(),
+            sleep(retryAfter * 1000),
+          ]);
+          if (flushed > 0) {
+            log.detail(`  Flushed ${flushed} codes to Neon during rate-limit wait`);
+          }
           continue;
         }
       }
