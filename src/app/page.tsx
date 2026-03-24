@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 const COMING_SOON_BRANDS = [
   { name: "Danfoss", category: "Frequency Drives" },
   { name: "Schneider Electric", category: "Altivar Drives & PLCs" },
