@@ -17,6 +17,8 @@ import {
   markCompleted,
   markFailed,
   getCacheStats,
+  getTextCache,
+  setTextCache,
 } from "./lib/cache.js";
 
 const MAX_PDFS = 5;
@@ -133,11 +135,25 @@ async function mine(brand: string): Promise<number> {
   }[] = [];
 
   for (const dl of downloaded) {
-    const pages = await extractDiagnosticText(dl.pdfPath, MAX_PAGES_PER_PDF);
-    if (pages.length > 0) {
+    const fn = path.basename(dl.pdfPath);
+    const cached = getTextCache(fn, brand);
+
+    if (cached) {
+      log.info(`  [TEXT CACHE] ${fn}: ${cached.length} pages from cache`);
       pdfTexts.push({
         ...dl,
-        filename: path.basename(dl.pdfPath),
+        filename: fn,
+        pages: cached,
+      });
+      continue;
+    }
+
+    const pages = await extractDiagnosticText(dl.pdfPath, MAX_PAGES_PER_PDF);
+    if (pages.length > 0) {
+      setTextCache(fn, brand, pages);
+      pdfTexts.push({
+        ...dl,
+        filename: fn,
         pages,
       });
     }

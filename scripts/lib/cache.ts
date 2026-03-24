@@ -85,3 +85,35 @@ export function getCacheStats(): { total: number; completed: number } {
     completed: entries.filter((e) => e.status === "completed").length,
   };
 }
+
+// ─── Text Cache ───
+// Persists extracted PDF text so Phase 3 scanning doesn't repeat across runs.
+
+const TEXT_CACHE_DIR = path.resolve(__dirname, "..", ".text-cache");
+
+function textCachePath(filename: string, brand: string): string {
+  fs.mkdirSync(TEXT_CACHE_DIR, { recursive: true });
+  return path.join(TEXT_CACHE_DIR, `${cacheKey(filename, brand).replace(/::/g, "_")}.json`);
+}
+
+export function getTextCache(
+  filename: string,
+  brand: string
+): { pageNumber: number; text: string }[] | null {
+  const p = textCachePath(filename, brand);
+  try {
+    if (fs.existsSync(p)) {
+      return JSON.parse(fs.readFileSync(p, "utf-8"));
+    }
+  } catch {}
+  return null;
+}
+
+export function setTextCache(
+  filename: string,
+  brand: string,
+  pages: { pageNumber: number; text: string }[]
+): void {
+  const p = textCachePath(filename, brand);
+  fs.writeFileSync(p, JSON.stringify(pages));
+}
