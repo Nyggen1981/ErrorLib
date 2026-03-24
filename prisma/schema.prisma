@@ -61,3 +61,13 @@ model MiningLog {
   @@index([createdAt])
   @@index([brand])
 }
+
+model MiningQueue {
+  id        String   @id @default(cuid())
+  brandName String
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+}

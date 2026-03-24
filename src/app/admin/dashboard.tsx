@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState, useCallback } from "react";
 
 type MiningLogEntry = {
   id: string;
@@ -11,6 +12,13 @@ type MiningLogEntry = {
   durationMs: number;
   status: string;
   message: string | null;
+  createdAt: string;
+};
+
+type QueueEntry = {
+  id: string;
+  brandName: string;
+  status: string;
   createdAt: string;
 };
 
@@ -35,6 +43,7 @@ type Props = {
     createdAt: string;
   }[];
   miningLogs: MiningLogEntry[];
+  queue: QueueEntry[];
 };
 
 function StatCard({
@@ -88,11 +97,178 @@ function statusBadge(status: string) {
   );
 }
 
+function queueStatusBadge(status: string) {
+  const styles: Record<string, string> = {
+    pending: "bg-warning/20 text-warning",
+    processing: "bg-accent/20 text-accent animate-pulse",
+    completed: "bg-success/20 text-success",
+  };
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] ?? "bg-technical-600 text-technical-300"}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function MiningQueuePanel({ initialQueue }: { initialQueue: QueueEntry[] }) {
+  const [queue, setQueue] = useState<QueueEntry[]>(initialQueue);
+  const [brandInput, setBrandInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/queue");
+      if (res.ok) {
+        const data = await res.json();
+        setQueue(data.items);
+      }
+    } catch {}
+  }, []);
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    const name = brandInput.trim();
+    if (!name) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/admin/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandName: name }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Failed to add brand");
+      } else {
+        setBrandInput("");
+        await refresh();
+      }
+    } catch {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRemove(id: string) {
+    try {
+      const res = await fetch(`/api/admin/queue?id=${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setQueue((prev) => prev.filter((q) => q.id !== id));
+      }
+    } catch {}
+  }
+
+  const activeItems = queue.filter(
+    (q) => q.status === "pending" || q.status === "processing"
+  );
+  const completedItems = queue.filter((q) => q.status === "completed");
+
+  return (
+    <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
+      <h2 className="mb-4 text-lg font-semibold text-white">Mining Queue</h2>
+
+      <form onSubmit={handleAdd} className="mb-4 flex gap-2">
+        <input
+          type="text"
+          value={brandInput}
+          onChange={(e) => setBrandInput(e.target.value)}
+          placeholder="Brand name (e.g. Mitsubishi)"
+          className="flex-1 rounded-lg border border-technical-600 bg-technical-900 px-3 py-2 text-sm text-white placeholder-technical-500 outline-none transition focus:border-accent"
+        />
+        <button
+          type="submit"
+          disabled={loading || !brandInput.trim()}
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent/80 disabled:opacity-50"
+        >
+          {loading ? "Adding..." : "Add Brand"}
+        </button>
+      </form>
+
+      {error && (
+        <p className="mb-3 text-sm text-danger">{error}</p>
+      )}
+
+      {activeItems.length > 0 ? (
+        <div className="space-y-2">
+          {activeItems.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center justify-between rounded-lg border border-technical-700 bg-technical-900 px-4 py-3"
+            >
+              <div className="flex items-center gap-3">
+                {queueStatusBadge(item.status)}
+                <span className="font-medium text-technical-200">
+                  {item.brandName}
+                </span>
+                <span className="text-xs text-technical-500">
+                  {timeAgo(item.createdAt)}
+                </span>
+              </div>
+              <button
+                onClick={() => handleRemove(item.id)}
+                className="rounded px-2 py-1 text-xs text-technical-400 transition hover:bg-danger/20 hover:text-danger"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-technical-500">
+          Queue is empty. Add a brand above to start mining.
+        </p>
+      )}
+
+      {completedItems.length > 0 && (
+        <div className="mt-4 border-t border-technical-700 pt-3">
+          <p className="mb-2 text-xs font-medium text-technical-400">
+            Recently completed
+          </p>
+          <div className="space-y-1">
+            {completedItems.slice(0, 5).map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between text-sm"
+              >
+                <div className="flex items-center gap-2">
+                  {queueStatusBadge(item.status)}
+                  <span className="text-technical-400">{item.brandName}</span>
+                </div>
+                <button
+                  onClick={() => handleRemove(item.id)}
+                  className="text-xs text-technical-500 transition hover:text-danger"
+                >
+                  Clear
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="mt-4 text-xs text-technical-500">
+        Run <code className="rounded bg-technical-700 px-1">npm run mine -- --queue</code> to process pending brands.
+      </p>
+    </div>
+  );
+}
+
 export function AdminDashboard({
   stats,
   brandStats,
   recentActivity,
   miningLogs,
+  queue,
 }: Props) {
   const router = useRouter();
 
@@ -146,6 +322,11 @@ export function AdminDashboard({
           value={stats.manualCount}
           accent="text-warning"
         />
+      </div>
+
+      {/* Mining Queue — full width */}
+      <div className="mb-8">
+        <MiningQueuePanel initialQueue={queue} />
       </div>
 
       {/* Mining Log — full width */}

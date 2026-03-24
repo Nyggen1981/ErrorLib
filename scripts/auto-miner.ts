@@ -111,6 +111,35 @@ function hasForceFlag(): boolean {
   return process.argv.slice(2).some((a) => a === "--force" || a === "-f");
 }
 
+function hasQueueFlag(): boolean {
+  return process.argv.slice(2).some((a) => a === "--queue" || a === "-q");
+}
+
+async function fetchQueueBrands(): Promise<
+  { id: string; brandName: string }[]
+> {
+  const prisma = getPrisma();
+  return prisma.miningQueue.findMany({
+    where: { status: "pending" },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+async function setQueueStatus(
+  id: string,
+  status: "processing" | "completed"
+): Promise<void> {
+  const prisma = getPrisma();
+  await prisma.miningQueue.update({ where: { id }, data: { status } });
+}
+
+async function deleteQueueItem(id: string): Promise<void> {
+  const prisma = getPrisma();
+  try {
+    await prisma.miningQueue.delete({ where: { id } });
+  } catch {}
+}
+
 function isNonEnglish(text: string): boolean {
   const sample = text.substring(0, 500).toLowerCase();
   for (const marker of NON_ENGLISH_MARKERS) {
@@ -432,35 +461,25 @@ async function mineWithRetry(
   return 0;
 }
 
-async function main() {
-  const singleBrand = parseBrandArg();
-  const force = hasForceFlag();
-
-  const brands = singleBrand !== null ? [singleBrand] : AUTO_BRANDS;
-
-  if (brands.length === 0 || (brands.length === 1 && !brands[0])) {
-    console.log(`
-Usage:
-  npm run mine -- --brand="ABB"         Mine a single brand
-  npm run mine -- --brand="ABB" --force Re-mine even if completed
-  npm run mine -- --all                 Mine all 5 brands autonomously
-  npm run mine                          Mine all 5 brands (default)
-
-Brands in the auto queue: ${AUTO_BRANDS.join(", ")}
-`);
-    process.exit(1);
-  }
-
+async function runBrandList(
+  brands: string[],
+  force: boolean,
+  queueIds?: Map<string, string>
+) {
   const globalStart = Date.now();
   let totalCodes = 0;
   const results: { brand: string; codes: number; status: string }[] = [];
   const savings = newSavings();
 
   const cacheStats = getCacheStats();
+  const isQueue = !!queueIds;
+
   log.banner(
     brands.length === 1
       ? `MINING: ${brands[0]}`
-      : `AUTONOMOUS MINING: ${brands.length} BRANDS`
+      : isQueue
+        ? `QUEUE MINING: ${brands.length} BRANDS`
+        : `AUTONOMOUS MINING: ${brands.length} BRANDS`
   );
   if (force) log.warn("--force flag active: re-mining completed brands");
   log.info(`Cache: ${cacheStats.completed} manuals already mined`);
@@ -472,9 +491,15 @@ Brands in the auto queue: ${AUTO_BRANDS.join(", ")}
 
   for (let i = 0; i < brands.length; i++) {
     const brand = brands[i];
+    const queueId = queueIds?.get(brand);
 
     if (brands.length > 1) {
       log.banner(`BRAND ${i + 1}/${brands.length}: ${brand.toUpperCase()}`);
+    }
+
+    if (queueId) {
+      await setQueueStatus(queueId, "processing");
+      log.info(`Queue status -> processing`);
     }
 
     // ─── INCREMENTAL: Skip completed brands unless --force ───
@@ -491,6 +516,7 @@ Brands in the auto queue: ${AUTO_BRANDS.join(", ")}
         status: "skipped",
         message: "Brand already completed — use --force to re-mine",
       });
+      if (queueId) await deleteQueueItem(queueId);
       continue;
     }
 
@@ -502,10 +528,19 @@ Brands in the auto queue: ${AUTO_BRANDS.join(", ")}
         codes: count,
         status: count > 0 ? "OK" : "EMPTY",
       });
+
+      if (queueId) {
+        await setQueueStatus(queueId, "completed");
+        log.info(`Queue status -> completed`);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       log.error(`Fatal error mining ${brand}: ${msg}`);
       results.push({ brand, codes: 0, status: "FAILED" });
+
+      if (queueId) {
+        await setQueueStatus(queueId, "completed");
+      }
     }
 
     if (i < brands.length - 1) {
@@ -524,7 +559,7 @@ Brands in the auto queue: ${AUTO_BRANDS.join(", ")}
   const elapsed = ((Date.now() - globalStart) / 1000).toFixed(1);
   const finalCache = getCacheStats();
 
-  log.banner("AUTONOMOUS MINING COMPLETE");
+  log.banner("MINING COMPLETE");
   log.info("");
   log.info("Results per brand:");
   for (const r of results) {
@@ -582,7 +617,52 @@ Brands in the auto queue: ${AUTO_BRANDS.join(", ")}
   log.info(`  Fault codes: ${dbFaults}`);
   log.info("");
   log.info("Site is live at: https://error-lib.vercel.app");
+}
 
+async function main() {
+  const singleBrand = parseBrandArg();
+  const force = hasForceFlag();
+  const useQueue = hasQueueFlag();
+
+  // ─── QUEUE MODE: Pull pending brands from the database ───
+  if (useQueue) {
+    const queueItems = await fetchQueueBrands();
+
+    if (queueItems.length === 0) {
+      log.banner("QUEUE MINING");
+      log.info("No pending brands in the queue.");
+      log.info("Add brands via the Admin Dashboard at /admin");
+      await disconnect();
+      return;
+    }
+
+    const brands = queueItems.map((q) => q.brandName);
+    const queueIds = new Map(queueItems.map((q) => [q.brandName, q.id]));
+
+    log.info(`Found ${queueItems.length} pending brand(s) in queue`);
+    await runBrandList(brands, force, queueIds);
+    await disconnect();
+    return;
+  }
+
+  // ─── STANDARD MODE: CLI args or auto brands ───
+  const brands = singleBrand !== null ? [singleBrand] : AUTO_BRANDS;
+
+  if (brands.length === 0 || (brands.length === 1 && !brands[0])) {
+    console.log(`
+Usage:
+  npm run mine -- --brand="ABB"         Mine a single brand
+  npm run mine -- --brand="ABB" --force Re-mine even if completed
+  npm run mine -- --queue               Mine brands from the admin queue
+  npm run mine -- --all                 Mine all 5 default brands
+  npm run mine                          Mine all 5 default brands
+
+Default brands: ${AUTO_BRANDS.join(", ")}
+`);
+    process.exit(1);
+  }
+
+  await runBrandList(brands, force);
   await disconnect();
 }
 
