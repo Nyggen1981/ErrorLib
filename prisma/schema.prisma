@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Brand {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  manuals   Manual[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Manual {
+  id         String      @id @default(cuid())
+  name       String
+  slug       String      @unique
+  pdfUrl     String?
+  imageUrl   String?
+  brand      Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brandId    String
+  faultCodes FaultCode[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([brandId])
+}
+
+model FaultCode {
+  id          String   @id @default(cuid())
+  code        String
+  slug        String   @unique
+  title       String
+  description String
+  fixSteps    String[]
+  manual      Manual   @relation(fields: [manualId], references: [id], onDelete: Cascade)
+  manualId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([manualId])
+  @@index([code])
+}

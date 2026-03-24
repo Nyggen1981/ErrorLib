@@ -1,0 +1,9 @@
+node_modules
+.next
+.env
+.env.local
+dist
+temp_manuals
+generated/prisma
+*.db
+*.db-journal
