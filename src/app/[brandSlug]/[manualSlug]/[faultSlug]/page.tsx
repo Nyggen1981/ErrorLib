@@ -167,10 +167,10 @@ export default async function FaultCodePage({ params }: Props) {
       </div>
 
       {/* Source link — subtle, at the very bottom */}
-      {fault.sourceUrl && (
+      {(fault.sourceUrl || fault.manual.pdfUrl) && (
         <div className="mt-12 border-t border-technical-100 pt-4 text-center">
           <a
-            href={fault.sourceUrl}
+            href={fault.sourceUrl || fault.manual.pdfUrl!}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs text-technical-400 transition hover:text-technical-600"
