@@ -29,7 +29,7 @@ function getGemini(): GoogleGenerativeAI {
 export async function preflight(): Promise<boolean> {
   try {
     const genAI = getGemini();
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent("Reply with only the word OK");
     const text = result.response.text().trim();
     return text.length > 0;
@@ -78,7 +78,7 @@ async function callGeminiText(
   maxRetries = 5
 ): Promise<ExtractionResult> {
   const genAI = getGemini();
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const prompt = `${BATCH_PROMPT}\n\n--- MANUAL TEXT START ---\n${pagesText}\n--- MANUAL TEXT END ---`;
 
