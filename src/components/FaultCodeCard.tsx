@@ -17,10 +17,14 @@ export function FaultCodeCard({
       className="group block rounded-xl border border-technical-200 bg-white p-5 transition-all hover:border-technical-300 hover:shadow-md"
     >
       <div className="mb-2 flex items-center gap-3">
-        <span className="rounded-md bg-technical-900 px-2.5 py-1 font-mono text-sm font-bold text-white">
+        <span
+          className={`shrink-0 whitespace-nowrap rounded-md bg-technical-900 px-3 py-1 font-mono font-bold text-white ${
+            code.length > 8 ? "text-xs" : code.length > 5 ? "text-sm" : "text-sm"
+          }`}
+        >
           {code}
         </span>
-        <h3 className="font-semibold text-technical-800 group-hover:text-accent transition-colors">
+        <h3 className="min-w-0 truncate font-semibold text-technical-800 group-hover:text-accent transition-colors">
           {title}
         </h3>
       </div>

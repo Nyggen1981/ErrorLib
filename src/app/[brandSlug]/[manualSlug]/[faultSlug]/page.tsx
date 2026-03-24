@@ -73,8 +73,16 @@ export default async function FaultCodePage({ params }: Props) {
       {/* Hero */}
       <section className="mb-8 rounded-2xl border border-technical-200 bg-white p-6 sm:p-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-technical-900 sm:h-24 sm:w-24">
-            <span className="font-mono text-2xl font-bold text-white sm:text-3xl">
+          <div className="flex min-w-[5rem] shrink-0 items-center justify-center rounded-xl bg-technical-900 px-4 py-5 sm:min-w-[6rem] sm:py-6">
+            <span
+              className={`whitespace-nowrap font-mono font-bold text-white ${
+                fault.code.length > 8
+                  ? "text-base sm:text-lg"
+                  : fault.code.length > 5
+                    ? "text-xl sm:text-2xl"
+                    : "text-2xl sm:text-3xl"
+              }`}
+            >
               {fault.code}
             </span>
           </div>
