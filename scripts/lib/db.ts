@@ -64,7 +64,6 @@ export async function upsertFaultCode(
   fixSteps: string[]
 ) {
   const prisma = getPrisma();
-  const slug = slugify(`${code}-${title}`);
 
   const existing = await prisma.faultCode.findFirst({
     where: { code, manualId },
@@ -77,16 +76,26 @@ export async function upsertFaultCode(
     });
   }
 
-  return prisma.faultCode.create({
-    data: {
-      code,
-      slug,
-      title,
-      description,
-      fixSteps,
-      manualId,
-    },
-  });
+  // Include manualId prefix to avoid slug collisions across manuals
+  const baseSlug = slugify(`${code}-${title}`);
+  let slug = baseSlug;
+  let attempt = 0;
+
+  while (true) {
+    try {
+      return await prisma.faultCode.create({
+        data: { code, slug, title, description, fixSteps, manualId },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("Unique constraint") && attempt < 3) {
+        attempt++;
+        slug = `${baseSlug}-${manualId.slice(-6)}-${attempt}`;
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 // ─── Mining Log ───
