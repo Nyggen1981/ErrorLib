@@ -9,7 +9,7 @@ import { extractAndSave } from "./lib/extract.js";
 import { upsertBrand, upsertManual, disconnect, getPrisma } from "./lib/db.js";
 
 const MAX_PDFS = 5;
-const MAX_PAGES_PER_PDF = 15;
+const MAX_PAGES_PER_PDF = 40;
 
 function parseBrandArg(): string {
   const args = process.argv.slice(2);
