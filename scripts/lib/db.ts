@@ -100,8 +100,14 @@ export async function createMiningLog(entry: {
   status: string;
   message?: string;
 }) {
-  const prisma = getPrisma();
-  return prisma.miningLog.create({ data: entry });
+  try {
+    const prisma = getPrisma();
+    await prisma.miningLog.create({ data: entry });
+    log.detail(`  [LOG] ${entry.status}: ${entry.brand} / ${entry.manual}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.warn(`  [LOG FAILED] Could not write mining log: ${msg.substring(0, 150)}`);
+  }
 }
 
 // ─── Background DB Queue ───

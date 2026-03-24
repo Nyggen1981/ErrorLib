@@ -154,6 +154,17 @@ async function mine(brand: string): Promise<number> {
 
     const manual = await upsertManual(brandRecord.id, manualName, pdf.url);
 
+    // Log "started" immediately so admin dashboard shows progress
+    await createMiningLog({
+      brand,
+      manual: manualName,
+      codesFound: 0,
+      pagesUsed: pdf.pages.length,
+      durationMs: 0,
+      status: "started",
+      message: `Processing ${pdf.pages.length} pages...`,
+    });
+
     const manualStart = Date.now();
     try {
       const count = await extractAndSave(pdf.pages, manual.id);
@@ -169,14 +180,15 @@ async function mine(brand: string): Promise<number> {
         pagesUsed: pdf.pages.length,
         durationMs: durMs,
         status: count > 0 ? "success" : "empty",
-        message: count > 0 ? `Extracted ${count} codes` : "No codes found",
-      }).catch(() => {});
+        message: count > 0 ? `Extracted ${count} codes` : "No codes found in pages",
+      });
 
       log.success(`  -> ${count} fault codes from ${manualName} (${(durMs / 1000).toFixed(1)}s)`);
     } catch (err) {
       const durMs = Date.now() - manualStart;
       markFailed(pdf.filename, pdf.url, brand);
 
+      const errMsg = err instanceof Error ? err.message.substring(0, 200) : "Unknown error";
       await createMiningLog({
         brand,
         manual: manualName,
@@ -184,8 +196,9 @@ async function mine(brand: string): Promise<number> {
         pagesUsed: pdf.pages.length,
         durationMs: durMs,
         status: "failed",
-        message: err instanceof Error ? err.message.substring(0, 200) : "Unknown error",
-      }).catch(() => {});
+        message: errMsg,
+      });
+      log.error(`  Mining log: failed - ${errMsg}`);
 
       throw err;
     }

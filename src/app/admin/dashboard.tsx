@@ -72,12 +72,13 @@ function statusBadge(status: string) {
     success: "bg-success/20 text-success",
     empty: "bg-warning/20 text-warning",
     failed: "bg-danger/20 text-danger",
+    started: "bg-accent/20 text-accent animate-pulse",
   };
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] ?? "bg-technical-600 text-technical-300"}`}
     >
-      {status}
+      {status === "started" ? "in progress" : status}
     </span>
   );
 }
