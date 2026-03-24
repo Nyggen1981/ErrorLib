@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 type MiningLogEntry = {
   id: string;
@@ -445,10 +445,32 @@ export function AdminDashboard({
   userRequests,
 }: Props) {
   const router = useRouter();
+  const [lastRefresh, setLastRefresh] = useState(Date.now());
+  const [countdown, setCountdown] = useState(30);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          router.refresh();
+          setLastRefresh(Date.now());
+          return 30;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [router]);
 
   async function handleLogout() {
     await fetch("/api/admin/auth", { method: "DELETE" });
     router.push("/admin/login");
+  }
+
+  function handleManualRefresh() {
+    router.refresh();
+    setLastRefresh(Date.now());
+    setCountdown(30);
   }
 
   const totalBrandCodes = brandStats.reduce((s, b) => s + b.faultCodes, 0);
@@ -464,6 +486,13 @@ export function AdminDashboard({
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleManualRefresh}
+            className="flex items-center gap-2 rounded-lg border border-technical-700 px-3 py-2 text-xs tabular-nums text-technical-400 transition hover:border-technical-500 hover:text-technical-200"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+            {countdown}s
+          </button>
           <a
             href="/"
             className="rounded-lg border border-technical-600 px-4 py-2 text-sm text-technical-300 transition hover:border-technical-400 hover:text-white"
