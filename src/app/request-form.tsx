@@ -69,7 +69,7 @@ export function RequestForm() {
                 : "Thank you! We'll look into it."}
             </p>
             <p className="mt-1 text-sm text-technical-500">
-              Popular requests are mined first.
+              Popular requests are added first.
             </p>
             <button
               onClick={() => setStatus("idle")}
