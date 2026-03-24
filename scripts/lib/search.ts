@@ -19,9 +19,9 @@ export async function searchManuals(
   }
 
   const queries = [
-    `${brand} fault code list PDF manual filetype:pdf`,
-    `${brand} troubleshooting guide error codes PDF filetype:pdf`,
-    `${brand} drive diagnostic manual PDF filetype:pdf`,
+    `${brand} fault code list PDF manual English filetype:pdf`,
+    `${brand} troubleshooting guide error codes PDF English filetype:pdf`,
+    `${brand} drive diagnostic manual PDF English filetype:pdf`,
   ];
 
   const allResults: SearchResult[] = [];

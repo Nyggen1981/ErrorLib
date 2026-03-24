@@ -73,12 +73,17 @@ function statusBadge(status: string) {
     empty: "bg-warning/20 text-warning",
     failed: "bg-danger/20 text-danger",
     started: "bg-accent/20 text-accent animate-pulse",
+    skipped: "bg-technical-500/20 text-technical-400",
+  };
+  const labels: Record<string, string> = {
+    started: "in progress",
+    skipped: "skipped",
   };
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] ?? "bg-technical-600 text-technical-300"}`}
     >
-      {status === "started" ? "in progress" : status}
+      {labels[status] ?? status}
     </span>
   );
 }

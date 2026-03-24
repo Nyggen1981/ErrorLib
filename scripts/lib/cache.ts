@@ -86,6 +86,41 @@ export function getCacheStats(): { total: number; completed: number } {
   };
 }
 
+export function isBrandCompleted(brand: string): boolean {
+  const cache = loadCache();
+  const key = `brand-done::${brand.toLowerCase()}`;
+  return cache.manuals[key]?.status === "completed";
+}
+
+export function markBrandCompleted(brand: string, totalCodes: number): void {
+  const cache = loadCache();
+  const key = `brand-done::${brand.toLowerCase()}`;
+  cache.manuals[key] = {
+    filename: brand,
+    url: "",
+    brand,
+    codesExtracted: totalCodes,
+    status: "completed",
+    minedAt: new Date().toISOString(),
+  };
+  saveCache(cache);
+}
+
+export function getMinedUrlsForBrand(brand: string): Set<string> {
+  const cache = loadCache();
+  const urls = new Set<string>();
+  for (const entry of Object.values(cache.manuals)) {
+    if (
+      entry.brand.toLowerCase() === brand.toLowerCase() &&
+      entry.url &&
+      entry.status === "completed"
+    ) {
+      urls.add(entry.url);
+    }
+  }
+  return urls;
+}
+
 // ─── Text Cache ───
 // Persists extracted PDF text so Phase 3 scanning doesn't repeat across runs.
 
