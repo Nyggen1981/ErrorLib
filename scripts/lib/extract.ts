@@ -138,9 +138,9 @@ function buildChunkText(
     .join("\n\n");
 }
 
-const MAX_CHARS_PER_REQUEST = 80_000;
+const MAX_CHARS_PER_REQUEST = 20_000;
 const MAX_CODES_PER_MANUAL = 60;
-const RATE_LIMIT_GAP_MS = 30_000;
+const RATE_LIMIT_GAP_MS = 35_000;
 
 export async function extractAndSave(
   pages: { pageNumber: number; text: string }[],

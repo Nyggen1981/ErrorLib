@@ -20,7 +20,7 @@ import {
 } from "./lib/cache.js";
 
 const MAX_PDFS = 5;
-const MAX_PAGES_PER_PDF = 40;
+const MAX_PAGES_PER_PDF = 15;
 const COOLDOWN_BETWEEN_BRANDS_MS = 10_000;
 
 const AUTO_BRANDS = [
