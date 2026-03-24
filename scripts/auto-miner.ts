@@ -119,6 +119,13 @@ async function fetchQueueBrands(): Promise<
   { id: string; brandName: string }[]
 > {
   const prisma = getPrisma();
+
+  // Reset stale "processing" items from interrupted runs back to pending
+  await prisma.miningQueue.updateMany({
+    where: { status: "processing" },
+    data: { status: "pending" },
+  });
+
   return prisma.miningQueue.findMany({
     where: { status: "pending" },
     orderBy: { createdAt: "asc" },
