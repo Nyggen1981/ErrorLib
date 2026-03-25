@@ -302,7 +302,7 @@ function UserRequestsPanel({
     } catch {}
   }
 
-  async function handleAction(id: string, action: "approve" | "reject") {
+  async function handleAction(id: string, action: "approve" | "reject" | "plan") {
     setBusy(id);
     try {
       const res = await fetch("/api/admin/requests", {
@@ -336,6 +336,7 @@ function UserRequestsPanel({
       pending: "bg-warning/20 text-warning",
       approved: "bg-success/20 text-success",
       rejected: "bg-danger/20 text-danger",
+      planned: "bg-accent/20 text-accent",
     };
     return (
       <span
@@ -385,13 +386,20 @@ function UserRequestsPanel({
                     {timeAgo(r.createdAt)}
                   </td>
                   <td className="py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => handleAction(r.id, "approve")}
                         disabled={busy === r.id}
                         className="rounded px-2.5 py-1 text-xs font-medium text-success transition hover:bg-success/20 disabled:opacity-50"
                       >
                         Approve & Mine
+                      </button>
+                      <button
+                        onClick={() => handleAction(r.id, "plan")}
+                        disabled={busy === r.id}
+                        className="rounded px-2.5 py-1 text-xs font-medium text-accent transition hover:bg-accent/20 disabled:opacity-50"
+                      >
+                        Coming Soon
                       </button>
                       <button
                         onClick={() => handleAction(r.id, "reject")}

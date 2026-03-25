@@ -3,16 +3,6 @@ import { RequestForm } from "./request-form";
 
 export const dynamic = "force-dynamic";
 
-const COMING_SOON_BRANDS = [
-  { name: "Danfoss", category: "Frequency Drives" },
-  { name: "Schneider Electric", category: "Altivar Drives & PLCs" },
-  { name: "Mitsubishi Electric", category: "FR Series Inverters" },
-  { name: "Yaskawa", category: "AC Drives" },
-  { name: "Rockwell / Allen-Bradley", category: "PowerFlex Drives" },
-  { name: "Lenze", category: "Servo & Frequency Inverters" },
-  { name: "Siemens", category: "SINAMICS & SIMATIC Drives" },
-];
-
 const BRAND_COLORS: Record<string, string> = {
   abb: "border-t-red-500",
   siemens: "border-t-sky-500",
@@ -25,14 +15,20 @@ const BRAND_COLORS: Record<string, string> = {
 };
 
 export default async function HomePage() {
-  const brands = await prisma.brand.findMany({
-    include: {
-      manuals: {
-        include: { _count: { select: { faultCodes: true } } },
+  const [brands, plannedRequests] = await Promise.all([
+    prisma.brand.findMany({
+      include: {
+        manuals: {
+          include: { _count: { select: { faultCodes: true } } },
+        },
       },
-    },
-    orderBy: { name: "asc" },
-  });
+      orderBy: { name: "asc" },
+    }),
+    prisma.userRequest.findMany({
+      where: { status: "planned" },
+      orderBy: { voteCount: "desc" },
+    }),
+  ]);
 
   const brandsWithStats = brands.map((b) => ({
     ...b,
@@ -46,18 +42,9 @@ export default async function HomePage() {
   const activeBrands = brandsWithStats.filter((b) => b.totalFaultCodes > 0);
   const activeNames = new Set(activeBrands.map((b) => b.name.toLowerCase()));
 
-  const comingSoon = COMING_SOON_BRANDS.filter(
-    (b) => !activeNames.has(b.name.toLowerCase())
+  const comingSoon = plannedRequests.filter(
+    (r) => !activeNames.has(r.brand.toLowerCase())
   );
-
-  for (const b of brandsWithStats) {
-    if (
-      b.totalFaultCodes === 0 &&
-      !comingSoon.some((c) => c.name.toLowerCase() === b.name.toLowerCase())
-    ) {
-      comingSoon.push({ name: b.name, category: "Industrial Equipment" });
-    }
-  }
 
   const totalCodes = activeBrands.reduce((s, b) => s + b.totalFaultCodes, 0);
 
@@ -91,8 +78,8 @@ export default async function HomePage() {
         {activeBrands.length === 0 ? (
           <div className="rounded-xl border border-dashed border-technical-300 bg-white p-12 text-center">
             <p className="text-technical-400">
-            No brands indexed yet. Documentation is currently being reviewed.
-          </p>
+              No brands indexed yet. Documentation is currently being reviewed.
+            </p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -124,26 +111,27 @@ export default async function HomePage() {
           </div>
         )}
 
-        {/* Coming Soon */}
+        {/* Under Documentation — driven by "planned" user requests */}
         {comingSoon.length > 0 && (
           <section className="mt-14">
             <div className="mb-5">
               <h2 className="text-lg font-semibold text-technical-700">
-                Pending Expansion
+                Under Documentation
               </h2>
               <p className="mt-1 text-sm text-technical-400">
-                Our technicians are currently indexing documentation for the following manufacturers.
+                Our technicians are currently indexing documentation for the
+                following manufacturers.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {comingSoon.map((brand) => (
+              {comingSoon.map((req) => (
                 <div
-                  key={brand.name}
+                  key={req.id}
                   className="flex items-center gap-4 rounded-xl border border-technical-100 bg-white/60 px-5 py-4"
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-technical-100">
                     <span className="font-mono text-xs font-bold text-technical-400">
-                      {brand.name
+                      {req.brand
                         .split(/[\s/]+/)
                         .map((w) => w[0])
                         .join("")
@@ -152,11 +140,14 @@ export default async function HomePage() {
                     </span>
                   </div>
                   <div>
-                    <p className="font-medium text-technical-500">
-                      {brand.name}
+                    <p className="font-medium text-technical-600">
+                      {req.brand}
                     </p>
-                    <p className="text-xs text-technical-300">
-                      {brand.category}
+                    <p className="text-xs text-technical-400">
+                      {req.voteCount}{" "}
+                      {req.voteCount === 1
+                        ? "technician request"
+                        : "technician requests"}
                     </p>
                   </div>
                 </div>
