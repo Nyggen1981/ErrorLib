@@ -233,7 +233,7 @@ export default async function FaultCodePage({ params }: Props) {
             <span className="font-medium text-technical-200">{t("sourceManual", locale)}</span>
             {" "}{fault.manual.name}
           </div>
-          {(fault.sourceUrl || fault.manual.pdfUrl) && (
+          {(fault.sourceUrl || fault.manual.pdfUrl) && !fault.manual.isBroken ? (
             <a
               href={fault.sourceUrl || fault.manual.pdfUrl!}
               target="_blank"
@@ -257,7 +257,11 @@ export default async function FaultCodePage({ params }: Props) {
                 ? `Open Manual (Page ${fault.sourcePage})`
                 : t("viewOfficialPDF", locale)}
             </a>
-          )}
+          ) : fault.manual.isBroken ? (
+            <span className="text-[10px] text-technical-400">
+              {t("sourceUnderMaintenance", locale)}
+            </span>
+          ) : null}
         </div>
       </div>
     </TranslatedContent>

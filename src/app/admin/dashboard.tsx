@@ -1053,6 +1053,188 @@ function TranslationPanel() {
   );
 }
 
+function LinkHealthPanel() {
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{
+    checked: number;
+    broken: number;
+    newlyBroken: number;
+    fixed: number;
+    emailSent: boolean;
+  } | null>(null);
+  const [brokenManuals, setBrokenManuals] = useState<
+    { id: string; name: string; brand: string; pdfUrl: string }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editUrl, setEditUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetchBrokenList();
+  }, []);
+
+  async function fetchBrokenList() {
+    try {
+      const res = await fetch("/api/admin/maintenance/broken-list");
+      if (res.ok) {
+        const data = await res.json();
+        setBrokenManuals(data.manuals ?? []);
+      }
+    } catch {}
+    setLoading(false);
+  }
+
+  async function handleScan() {
+    setScanning(true);
+    setScanResult(null);
+    try {
+      const res = await fetch("/api/admin/maintenance/check-links", {
+        method: "POST",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setScanResult(data);
+        await fetchBrokenList();
+      }
+    } catch {}
+    setScanning(false);
+  }
+
+  async function handleSaveUrl(manualId: string) {
+    if (!editUrl.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/maintenance/update-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manualId, pdfUrl: editUrl.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.isValid) {
+          setBrokenManuals((prev) => prev.filter((m) => m.id !== manualId));
+        }
+        setEditId(null);
+        setEditUrl("");
+      }
+    } catch {}
+    setSaving(false);
+  }
+
+  return (
+    <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-white">PDF Link Health</h2>
+          <p className="mt-0.5 text-xs text-technical-400">
+            Scan all manual PDF URLs for broken links
+          </p>
+        </div>
+        <button
+          onClick={handleScan}
+          disabled={scanning}
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-technical-900 transition hover:bg-accent/80 disabled:opacity-50"
+        >
+          {scanning ? (
+            <span className="flex items-center gap-2">
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Scanning...
+            </span>
+          ) : (
+            "Run Health Check"
+          )}
+        </button>
+      </div>
+
+      {scanResult && (
+        <div className="mb-4 rounded-lg border border-technical-600 bg-technical-900 p-3 text-sm">
+          <div className="flex flex-wrap gap-4">
+            <span className="text-technical-200">
+              Checked: <strong>{scanResult.checked}</strong>
+            </span>
+            <span className={scanResult.broken > 0 ? "text-danger" : "text-success"}>
+              Broken: <strong>{scanResult.broken}</strong>
+            </span>
+            {scanResult.newlyBroken > 0 && (
+              <span className="text-warning">
+                New: <strong>{scanResult.newlyBroken}</strong>
+              </span>
+            )}
+            {scanResult.fixed > 0 && (
+              <span className="text-success">
+                Fixed: <strong>{scanResult.fixed}</strong>
+              </span>
+            )}
+            {scanResult.emailSent && (
+              <span className="text-accent">Email sent</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {brokenManuals.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-danger">
+            {brokenManuals.length} broken link{brokenManuals.length !== 1 ? "s" : ""}
+          </p>
+          {brokenManuals.map((m) => (
+            <div
+              key={m.id}
+              className="rounded-lg border border-danger/30 bg-technical-900 p-3"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-technical-200">
+                    <span className="text-danger">⚠</span> {m.brand} — {m.name}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-technical-500">
+                    {m.pdfUrl}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditId(editId === m.id ? null : m.id);
+                    setEditUrl(m.pdfUrl);
+                  }}
+                  className="shrink-0 rounded bg-technical-700 px-2.5 py-1 text-xs text-technical-300 transition hover:bg-technical-600 hover:text-white"
+                >
+                  {editId === m.id ? "Cancel" : "Edit URL"}
+                </button>
+              </div>
+              {editId === m.id && (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="url"
+                    value={editUrl}
+                    onChange={(e) => setEditUrl(e.target.value)}
+                    placeholder="New PDF URL..."
+                    className="flex-1 rounded border border-technical-600 bg-technical-800 px-3 py-1.5 text-xs text-white placeholder-technical-400 outline-none focus:border-accent"
+                  />
+                  <button
+                    onClick={() => handleSaveUrl(m.id)}
+                    disabled={saving || !editUrl.trim()}
+                    className="rounded bg-success px-3 py-1.5 text-xs font-medium text-white transition hover:bg-success/80 disabled:opacity-50"
+                  >
+                    {saving ? "..." : "Save & Validate"}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : !loading && !scanning ? (
+        <p className="text-sm text-success">All PDF links are healthy.</p>
+      ) : loading ? (
+        <p className="text-sm text-technical-400 animate-pulse">Loading...</p>
+      ) : null}
+    </div>
+  );
+}
+
 type Suggestion = {
   series: string;
   category: string;
@@ -1478,6 +1660,11 @@ export function AdminDashboard({
             </p>
           )}
         </div>
+      </div>
+
+      {/* Link Health */}
+      <div className="mb-8">
+        <LinkHealthPanel />
       </div>
 
       {/* Expand Brand */}

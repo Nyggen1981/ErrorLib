@@ -17,16 +17,18 @@ model Brand {
 }
 
 model Manual {
-  id         String      @id @default(cuid())
-  name       String
-  slug       String      @unique
-  pdfUrl     String?
-  imageUrl   String?
-  brand      Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  brandId    String
-  faultCodes FaultCode[]
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id            String      @id @default(cuid())
+  name          String
+  slug          String      @unique
+  pdfUrl        String?
+  imageUrl      String?
+  isBroken      Boolean     @default(false)
+  lastValidated DateTime?
+  brand         Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brandId       String
+  faultCodes    FaultCode[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   @@index([brandId])
 }

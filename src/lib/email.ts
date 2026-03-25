@@ -33,6 +33,42 @@ export async function sendAdminAlert(
   }
 }
 
+export async function sendBrokenLinksAlert(
+  broken: { brand: string; manual: string; url: string }[]
+) {
+  if (broken.length === 0) return;
+  try {
+    const rows = broken
+      .map(
+        (b) =>
+          `<tr><td style="padding:4px 8px;border:1px solid #333">${b.brand}</td><td style="padding:4px 8px;border:1px solid #333">${b.manual}</td><td style="padding:4px 8px;border:1px solid #333;font-size:11px;word-break:break-all">${b.url}</td></tr>`
+      )
+      .join("");
+    await getResend().emails.send({
+      from: FROM_ADDRESS,
+      to: ADMIN_EMAIL,
+      subject: `ErrorLib: ${broken.length} broken PDF link${broken.length > 1 ? "s" : ""} detected`,
+      html: `
+        <h2 style="color:#ef4444">Broken PDF Links Detected</h2>
+        <p>${broken.length} manual PDF link${broken.length > 1 ? "s" : ""} returned errors during the health check.</p>
+        <table style="border-collapse:collapse;width:100%;font-size:13px;margin:16px 0">
+          <tr style="background:#1e1e1e;color:#ededed">
+            <th style="padding:6px 8px;text-align:left;border:1px solid #333">Brand</th>
+            <th style="padding:6px 8px;text-align:left;border:1px solid #333">Manual</th>
+            <th style="padding:6px 8px;text-align:left;border:1px solid #333">URL</th>
+          </tr>
+          ${rows}
+        </table>
+        <p>Log in to the <a href="https://errorlib.net/admin">Admin Dashboard</a> to fix or replace these URLs.</p>
+        <hr>
+        <p style="color:#64748b;font-size:12px;">ErrorLib Health Monitor</p>
+      `,
+    });
+  } catch (err) {
+    console.warn("[EMAIL] Failed to send broken links alert:", err);
+  }
+}
+
 export async function sendBrandLiveNotification(
   brand: string,
   emails: string[]

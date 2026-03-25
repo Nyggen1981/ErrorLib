@@ -114,6 +114,7 @@ const dict = {
   },
   sourceManual: { en: "Source:", no: "Kilde:", de: "Quelle:", es: "Fuente:" },
   viewOfficialPDF: { en: "View Official PDF", no: "Åpne offisiell PDF", de: "Offizielles PDF öffnen", es: "Ver PDF oficial" },
+  sourceUnderMaintenance: { en: "Source link under maintenance", no: "Kildelenke under vedlikehold", de: "Quelllink wird gewartet", es: "Enlace de fuente en mantenimiento" },
   translating: { en: "Translating...", no: "Oversetter...", de: "Übersetzen...", es: "Traduciendo..." },
 
   // ─── Brand page ───
