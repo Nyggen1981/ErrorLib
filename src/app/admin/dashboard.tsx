@@ -527,6 +527,12 @@ export function AdminDashboard({
             {countdown}s
           </button>
           <a
+            href="/admin/edit-codes"
+            className="rounded-lg border border-accent/50 px-4 py-2 text-sm text-accent transition hover:border-accent hover:bg-accent/10"
+          >
+            Edit Codes
+          </a>
+          <a
             href="/"
             className="rounded-lg border border-technical-600 px-4 py-2 text-sm text-technical-300 transition hover:border-technical-400 hover:text-white"
           >

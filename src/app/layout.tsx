@@ -64,7 +64,14 @@ export default function RootLayout({
         <main>{children}</main>
         <footer className="bg-technical-900 text-technical-500">
           <div className="mx-auto max-w-6xl px-4 py-5 text-center text-xs sm:px-6">
-            ErrorLib &mdash; Industrial Fault Code Library
+            <p>ErrorLib &mdash; Industrial Fault Code Library</p>
+            <p className="mx-auto mt-3 max-w-3xl text-[11px] leading-relaxed text-technical-600">
+              Disclaimer: ErrorLib is an independent technical reference tool.
+              While we aim for accuracy, always verify with the
+              manufacturer&apos;s official service manuals before performing
+              maintenance on industrial equipment. ErrorLib is not affiliated
+              with the brands listed.
+            </p>
           </div>
         </footer>
       </body>
