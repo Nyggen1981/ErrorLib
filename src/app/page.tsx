@@ -119,41 +119,23 @@ export default async function HomePage() {
                 Under Documentation
               </h2>
               <p className="mt-1 text-sm text-technical-400">
-                Our technicians are currently indexing documentation for the
-                following manufacturers.
+                Planned for next update
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {comingSoon.map((req) => (
                 <div
                   key={req.id}
-                  className="flex items-center gap-4 rounded-xl border border-technical-100 bg-white/60 px-5 py-4 transition-all duration-200 hover:border-technical-200 hover:shadow-sm"
+                  className="rounded-xl border border-technical-100 bg-white/60 px-5 py-4 transition-all duration-200 hover:border-technical-200 hover:shadow-sm"
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50">
-                    <svg
-                      className="h-5 w-5 text-amber-500"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.381z" />
-                    </svg>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-technical-600">
-                      {req.brand}
+                  <p className="font-medium text-technical-600">
+                    {req.brand}
+                  </p>
+                  {req.voteCount >= 20 && (
+                    <p className="mt-1 text-xs text-technical-400">
+                      {req.voteCount} requests
                     </p>
-                    <div className="mt-1 flex items-center gap-2">
-                      {req.voteCount >= 25 ? (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-                          {req.voteCount} requests
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-                          High Demand
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
