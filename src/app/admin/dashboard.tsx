@@ -130,6 +130,10 @@ function MiningQueuePanel({ initialQueue }: { initialQueue: QueueEntry[] }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setQueue(initialQueue);
+  }, [initialQueue]);
+
   const refresh = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/queue");
@@ -283,6 +287,10 @@ function UserRequestsPanel({
   const [requests, setRequests] =
     useState<UserRequestEntry[]>(initialRequests);
   const [busy, setBusy] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRequests(initialRequests);
+  }, [initialRequests]);
 
   async function refresh() {
     try {
