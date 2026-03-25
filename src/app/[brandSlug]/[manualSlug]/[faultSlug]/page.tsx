@@ -10,6 +10,7 @@ import {
   TranslatedFullSteps,
   TranslatingBanner,
 } from "@/components/FaultCodeContent";
+import { AdSlot } from "@/components/AdSlot";
 import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
 import type { Metadata } from "next";
@@ -204,6 +205,7 @@ export default async function FaultCodePage({ params }: Props) {
             <TranslatedPrioritySteps />
             <TranslatedMoreSteps label={t("moreStepsBelow", locale)} />
           </div>
+          <AdSlot slot="sidebar" className="mt-6" />
         </aside>
 
         {/* Main Content */}
@@ -221,6 +223,8 @@ export default async function FaultCodePage({ params }: Props) {
             </h2>
             <TranslatedFullSteps />
           </section>
+
+          <AdSlot slot="content" />
         </div>
       </div>
 

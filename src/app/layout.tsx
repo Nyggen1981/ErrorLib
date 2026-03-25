@@ -96,9 +96,15 @@ export default async function RootLayout({
         </header>
         <main className="overflow-x-hidden">{children}</main>
         <footer className="bg-technical-900 text-technical-500">
-          <div className="mx-auto max-w-6xl px-4 py-5 text-center text-xs sm:px-6">
-            <p>{t("footerTitle", locale)}</p>
-            <p className="mx-auto mt-3 max-w-3xl text-[11px] leading-relaxed text-technical-600">
+          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
+              <span>{t("footerTitle", locale)}</span>
+              <span className="hidden text-technical-700 sm:inline">|</span>
+              <a href="/about" className="transition hover:text-technical-300">About</a>
+              <a href="/privacy" className="transition hover:text-technical-300">Privacy</a>
+              <a href="/terms" className="transition hover:text-technical-300">Terms</a>
+            </div>
+            <p className="mx-auto mt-3 max-w-3xl text-center text-[11px] leading-relaxed text-technical-600">
               {t("disclaimer", locale)}
             </p>
           </div>

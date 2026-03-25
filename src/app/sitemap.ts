@@ -46,6 +46,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1,
       alternates: buildAlternates("/", activeLangs),
     },
+    {
+      url: `${BASE}/about`,
+      changeFrequency: "monthly",
+      priority: 0.4,
+    },
+    {
+      url: `${BASE}/privacy`,
+      changeFrequency: "yearly",
+      priority: 0.2,
+    },
+    {
+      url: `${BASE}/terms`,
+      changeFrequency: "yearly",
+      priority: 0.2,
+    },
   ];
 
   for (const brand of brands) {
