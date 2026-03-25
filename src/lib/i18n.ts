@@ -147,6 +147,7 @@ const dict = {
   },
   home: { en: "Home", no: "Hjem", de: "Startseite", es: "Inicio" },
   includes: { en: "Includes", no: "Inkluderer", de: "Beinhaltet", es: "Incluye" },
+  viewCodes: { en: "View fault codes", no: "Se feilkoder", de: "Fehlercodes anzeigen", es: "Ver códigos de falla" },
 
   // ─── Search ───
   searchPlaceholder: {

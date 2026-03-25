@@ -21,60 +21,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-const STRIP_SUFFIXES = [
-  /\b(list|manual|guide|handbook|reference|instruction)\b/gi,
-  /\b(diagnostics?\s*(and|&)?\s*alarms?)\b/gi,
-  /\b(faults?\s*(and|&)?\s*alarms?)\b/gi,
-  /\b(variable\s+speed\s+drive)\b/gi,
-  /\b(general\s+purpose\s+drive)\b/gi,
-  /\b(frequency\s+(inverter|converter|drive))\b/gi,
-  /\b(programming|technical|user)\s+(guide|manual)\b/gi,
-  /\b(cnc\s+control)\b/gi,
-  /\bcontroller\b/gi,
-];
-
-function cleanTitle(name: string, brandName: string): string {
-  let clean = name;
-
-  const brandWords = brandName.split(/\s+/);
-  for (const word of brandWords) {
-    clean = clean.replace(new RegExp(`^${word}\\s*`, "i"), "");
-  }
-
-  for (const re of STRIP_SUFFIXES) {
-    clean = clean.replace(re, "");
-  }
-
-  clean = clean.replace(/[,\-–—]+\s*$/, "").replace(/\s+/g, " ").trim();
-
-  return clean || name;
-}
-
-function extractModelFamily(cleanedTitle: string): string {
-  const words = cleanedTitle.split(/\s+/);
-  const family: string[] = [];
-
-  for (const word of words) {
-    if (family.length >= 2) break;
-    if (/^[A-Z0-9]/.test(word) && word.length >= 2) {
-      family.push(word);
-    } else if (family.length > 0) {
-      break;
-    }
-  }
-
-  if (family.length === 0) return cleanedTitle.split(/\s+/).slice(0, 2).join(" ");
-  return family.join(" ");
-}
-
-function variantLabel(cleanedTitle: string, family: string): string {
-  return cleanedTitle
-    .replace(family, "")
-    .replace(/^[\s,\-–—]+/, "")
-    .replace(/[\s,\-–—]+$/, "")
-    .trim();
-}
-
 type ManualWithCount = {
   id: string;
   name: string;
@@ -82,39 +28,86 @@ type ManualWithCount = {
   _count: { faultCodes: number };
 };
 
-type ModelGroup = {
-  family: string;
-  manuals: ManualWithCount[];
+type SeriesGroup = {
+  series: string;
+  manuals: { manual: ManualWithCount; label: string }[];
   totalCodes: number;
-  variants: string[];
 };
 
-function groupManuals(
-  manuals: ManualWithCount[],
-  brandName: string
-): ModelGroup[] {
-  const groups = new Map<string, ModelGroup>();
+// ── Smart Grouping Engine ──
+
+const SERIES_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
+  [/\b(ACS\d{3})/i, (m) => m[1].toUpperCase()],
+  [/\b(AC500)/i, () => "AC500"],
+  [/\b(AX\d{4})/i, (m) => m[1].toUpperCase()],
+  [/\b(PowerFlex)\s*(\d+)/i, (m) => `PowerFlex ${m[2]}`],
+  [/\b(VLT)\s+([\w-]+)/i, (m) => `VLT ${m[2]}`],
+  [/\b(FC\s*\d{2,3})/i, (m) => m[1].replace(/\s+/g, "").toUpperCase()],
+  [/\b(SINAMICS)\s+(\w+)/i, (m) => `SINAMICS ${m[2]}`],
+  [/\b(SINUMERIK)\s+(\w+)/i, (m) => `SINUMERIK ${m[2]}`],
+  [/\b(MOVIDRIVE)\b/i, () => "MOVIDRIVE"],
+  [/\b(MOVIFIT)\b/i, () => "MOVIFIT"],
+  [/\b(Altivar|ALTIVAR|ATV)\s*(\d+)/i, (m) => `Altivar ${m[2]}`],
+  [/\b(Altistart)\s*(\d+)/i, (m) => `Altistart ${m[2]}`],
+  [/\b(TwinCAT)\s*(\d*)/i, (m) => m[2] ? `TwinCAT ${m[2]}` : "TwinCAT"],
+  [/\b(TwinSAFE)\b/i, () => "TwinSAFE"],
+  [/\b(FR[-\s]?[A-Z]\d{3})/i, (m) => m[1].replace(/\s+/g, "").toUpperCase()],
+  [/\b(NXS|NXP)\b/i, () => "NXS/NXP"],
+  [/\b(MX2)\b/i, () => "MX2"],
+  [/\b([A-Z]\d{3,4})\s/i, (m) => m[1].toUpperCase()],
+];
+
+function extractSeries(manualName: string, brandName: string): string {
+  const stripped = manualName
+    .replace(new RegExp(`^${brandName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`, "i"), "")
+    .trim();
+
+  for (const [pattern, extract] of SERIES_PATTERNS) {
+    const match = stripped.match(pattern);
+    if (match) return extract(match);
+  }
+
+  const words = stripped.split(/\s+/);
+  const lead = words
+    .slice(0, 2)
+    .filter((w) => /^[A-Z0-9]/.test(w) && w.length >= 2);
+  return lead.length > 0 ? lead.join(" ") : words.slice(0, 2).join(" ");
+}
+
+function manualLabel(manualName: string, brandName: string, series: string): string {
+  let label = manualName
+    .replace(new RegExp(`^${brandName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`, "i"), "")
+    .replace(new RegExp(series.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), "")
+    .replace(/^[\s,\-–—:]+/, "")
+    .replace(/[\s,\-–—:]+$/, "")
+    .replace(/\b(variable\s+speed|frequency|adjustable\s+frequency)\s+(ac\s+)?drive\b/gi, "")
+    .replace(/\b(ac\s+)?drive\b/gi, "")
+    .replace(/\b(list|manual|guide|handbook|reference|instruction)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!label || label.length < 2) label = "General";
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function groupManuals(manuals: ManualWithCount[], brandName: string): SeriesGroup[] {
+  const groups = new Map<string, SeriesGroup>();
 
   for (const manual of manuals) {
     if (manual._count.faultCodes === 0) continue;
 
-    const cleaned = cleanTitle(manual.name, brandName);
-    const family = extractModelFamily(cleaned);
-    const variant = variantLabel(cleaned, family);
+    const series = extractSeries(manual.name, brandName);
+    const label = manualLabel(manual.name, brandName, series);
 
-    const existing = groups.get(family);
+    const existing = groups.get(series);
     if (existing) {
-      existing.manuals.push(manual);
+      existing.manuals.push({ manual, label });
       existing.totalCodes += manual._count.faultCodes;
-      if (variant && !existing.variants.includes(variant)) {
-        existing.variants.push(variant);
-      }
     } else {
-      groups.set(family, {
-        family,
-        manuals: [manual],
+      groups.set(series, {
+        series,
+        manuals: [{ manual, label }],
         totalCodes: manual._count.faultCodes,
-        variants: variant ? [variant] : [],
       });
     }
   }
@@ -159,47 +152,63 @@ export default async function BrandPage({ params }: Props) {
       </div>
 
       {groups.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           {groups.map((group) => {
+            const hasSingleManual = group.manuals.length === 1;
             const primary = group.manuals.reduce((best, m) =>
-              m._count.faultCodes > best._count.faultCodes ? m : best
+              m.manual._count.faultCodes > best.manual._count.faultCodes ? m : best
             );
-            const manualCount = group.manuals.length;
-            const hasVariants = group.variants.length > 0;
 
             return (
-              <a
-                key={group.family}
-                href={`/${brand.slug}/${primary.slug}`}
-                className="group flex flex-col rounded-lg border border-technical-700 bg-technical-800 p-5 transition-all hover:border-technical-500 hover:bg-technical-700"
+              <div
+                key={group.series}
+                className="rounded-lg border border-technical-700 bg-technical-800 p-5"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-lg font-bold tracking-tight text-technical-50 transition-colors group-hover:text-accent">
-                    {group.family}
+                  <h2 className="text-xl font-bold tracking-tight text-technical-50">
+                    {group.series}
                   </h2>
-                  {manualCount > 1 && (
-                    <span className="shrink-0 rounded bg-technical-600 px-2 py-0.5 text-xs font-medium text-technical-200">
-                      {manualCount} {t("manuals", locale)}
-                    </span>
-                  )}
+                  <span className="shrink-0 rounded bg-accent/15 px-2.5 py-0.5 text-sm font-bold tabular-nums text-accent">
+                    {group.totalCodes}
+                  </span>
                 </div>
 
-                <p className="mt-1.5 text-lg font-semibold tabular-nums text-accent">
-                  {group.totalCodes}{" "}
-                  <span className="text-sm font-normal text-technical-300">
-                    {group.totalCodes === 1 ? t("faultCode", locale) : t("faultCodes", locale)}
-                  </span>
+                <p className="mt-1 text-xs text-technical-400">
+                  {group.manuals.length}{" "}
+                  {group.manuals.length === 1 ? t("manual", locale) : t("manuals", locale)}
+                  {" \u00B7 "}
+                  {group.totalCodes} {t("faultCodes", locale)}
                 </p>
 
-                {hasVariants && (
-                  <p className="mt-1.5 text-xs text-technical-400">
-                    {t("includes", locale)} {group.variants.slice(0, 4).join(", ")}
-                    {group.variants.length > 4
-                      ? ` +${group.variants.length - 4} more`
-                      : ""}
-                  </p>
+                {hasSingleManual ? (
+                  <a
+                    href={`/${brand.slug}/${primary.manual.slug}`}
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-accent transition hover:text-accent/80"
+                  >
+                    {t("viewCodes", locale)}
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                    </svg>
+                  </a>
+                ) : (
+                  <div className="mt-3 space-y-1">
+                    {group.manuals
+                      .sort((a, b) => b.manual._count.faultCodes - a.manual._count.faultCodes)
+                      .map(({ manual, label }) => (
+                        <a
+                          key={manual.id}
+                          href={`/${brand.slug}/${manual.slug}`}
+                          className="flex items-center justify-between rounded-md border border-technical-600 bg-technical-900/50 px-3 py-2 text-sm transition hover:border-technical-500 hover:bg-technical-700"
+                        >
+                          <span className="truncate text-technical-200">{label}</span>
+                          <span className="ml-2 shrink-0 text-xs tabular-nums text-technical-400">
+                            {manual._count.faultCodes}
+                          </span>
+                        </a>
+                      ))}
+                  </div>
                 )}
-              </a>
+              </div>
             );
           })}
         </div>
