@@ -100,6 +100,7 @@ export async function GET(req: NextRequest) {
     {
       brand: string;
       brandSlug: string;
+      seen: Set<string>;
       codes: { code: string; title: string; href: string }[];
     }
   > = {};
@@ -110,9 +111,13 @@ export async function GET(req: NextRequest) {
       grouped[bName] = {
         brand: bName,
         brandSlug: fc.manual.brand.slug,
+        seen: new Set(),
         codes: [],
       };
     }
+    const dedup = `${fc.code}::${fc.title.toLowerCase()}`;
+    if (grouped[bName].seen.has(dedup)) continue;
+    grouped[bName].seen.add(dedup);
     grouped[bName].codes.push({
       code: fc.code,
       title: fc.title,
@@ -127,7 +132,11 @@ export async function GET(req: NextRequest) {
         slug: b.slug,
         manualCount: b._count.manuals,
       })),
-      faultGroups: Object.values(grouped),
+      faultGroups: Object.values(grouped).map(({ brand, brandSlug, codes }) => ({
+        brand,
+        brandSlug,
+        codes,
+      })),
     },
     query: q,
   });
