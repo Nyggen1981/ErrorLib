@@ -40,15 +40,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   )
     return {};
 
-  const display = stripBrand(fault.manual.name, fault.manual.brand.name);
-  const title = `How to fix ${fault.manual.brand.name} ${display} ${fault.code} - ${fault.title}`;
+  const brand = fault.manual.brand.name;
+  const display = stripBrand(fault.manual.name, brand);
+  const title = `${brand} Error ${fault.code}: ${fault.title} — Troubleshooting Guide`;
+  const description = `Find causes and solutions for ${brand} fault code ${fault.code}. Expert technical reference for industrial automation. ${fault.description.slice(0, 100)}`;
+  const url = `/${fault.manual.brand.slug}/${fault.manual.slug}/${fault.slug}`;
   return {
     title,
-    description: fault.description.slice(0, 160),
+    description,
+    alternates: { canonical: url },
     openGraph: {
       title,
-      description: fault.description.slice(0, 160),
+      description,
       type: "article",
+      url,
     },
   };
 }
@@ -80,8 +85,47 @@ export default async function FaultCodePage({ params }: Props) {
   const translations = (fault.translations as Record<string, typeof englishContent>) ?? {};
   const cachedTranslation = locale !== "en" ? translations[locale] ?? null : null;
 
+  const brandName = fault.manual.brand.name;
+  const pageUrl = `https://errorlib.net/${fault.manual.brand.slug}/${fault.manual.slug}/${fault.slug}`;
+
+  const howToSchema = {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    name: `How to fix ${brandName} ${fault.code}: ${fault.title}`,
+    description: fault.description,
+    step: fault.fixSteps.map((step, i) => ({
+      "@type": "HowToStep",
+      position: i + 1,
+      text: step,
+    })),
+  };
+
+  const articleSchema = {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    headline: `${brandName} Error ${fault.code}: ${fault.title}`,
+    description: fault.description,
+    url: pageUrl,
+    publisher: {
+      "@type": "Organization",
+      name: "ErrorLib",
+      url: "https://errorlib.net",
+    },
+    datePublished: fault.createdAt.toISOString(),
+    dateModified: fault.updatedAt.toISOString(),
+  };
+
   return (
-    <TranslatedContent
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(howToSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
+      />
+      <TranslatedContent
       faultCodeId={fault.id}
       locale={locale}
       fallback={englishContent}
@@ -206,5 +250,6 @@ export default async function FaultCodePage({ params }: Props) {
         </div>
       )}
     </TranslatedContent>
+    </>
   );
 }

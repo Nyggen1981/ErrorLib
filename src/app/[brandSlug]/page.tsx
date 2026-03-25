@@ -11,9 +11,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { brandSlug } = await params;
   const brand = await prisma.brand.findUnique({ where: { slug: brandSlug } });
   if (!brand) return {};
+  const title = `Complete List of ${brand.name} Fault Codes & Manuals | ErrorLib`;
+  const description = `Browse all ${brand.name} fault codes, error descriptions, and step-by-step troubleshooting guides for industrial drives, PLCs, and controllers.`;
   return {
-    title: `${brand.name} Fault Codes & Manuals`,
-    description: `Browse all ${brand.name} manuals and fault codes. Find troubleshooting guides for ${brand.name} industrial equipment.`,
+    title,
+    description,
+    alternates: { canonical: `/${brand.slug}` },
+    openGraph: { title, description, type: "website", url: `/${brand.slug}` },
   };
 }
 

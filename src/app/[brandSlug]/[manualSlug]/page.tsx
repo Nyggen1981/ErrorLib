@@ -21,9 +21,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
   if (!manual || manual.brand.slug !== brandSlug) return {};
   const display = stripBrand(manual.name, manual.brand.name);
+  const title = `${manual.brand.name} ${display} Fault Codes — Complete Error List`;
+  const description = `All fault codes for the ${manual.brand.name} ${display}. Causes, descriptions, and step-by-step troubleshooting for every error code.`;
+  const url = `/${manual.brand.slug}/${manual.slug}`;
   return {
-    title: `${manual.brand.name} ${display} - All Fault Codes`,
-    description: `Complete list of fault codes for the ${manual.brand.name} ${display}. Step-by-step troubleshooting guides for every error.`,
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { title, description, type: "website", url },
   };
 }
 

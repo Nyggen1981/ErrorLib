@@ -2,16 +2,17 @@ import type { Metadata } from "next";
 import { t } from "@/lib/i18n";
 import { getLocale, getActiveLanguages } from "@/lib/locale";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { HreflangTags } from "@/components/HreflangTags";
 import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://errorlib.net"),
   title: {
-    default: "ErrorLib - Industrial Fault Code Library",
+    default: "ErrorLib — Industrial Fault Code Library | Troubleshooting Guides",
     template: "%s | ErrorLib",
   },
   description:
-    "Comprehensive fault code database for industrial equipment. Quick troubleshooting guides for ABB, Siemens, Danfoss drives and more.",
+    "Comprehensive fault code database for industrial equipment. Step-by-step troubleshooting guides for ABB, Siemens, Danfoss, Yaskawa drives, PLCs, and controllers.",
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -19,6 +20,9 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: "/",
+  },
+  other: {
+    "google-site-verification": "",
   },
 };
 
@@ -33,6 +37,7 @@ export default async function RootLayout({
   return (
     <html lang={locale}>
       <head>
+        <HreflangTags activeLanguages={activeLanguages} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
@@ -45,6 +50,23 @@ export default async function RootLayout({
         />
       </head>
       <body className="bg-technical-50 text-technical-900 antialiased">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "ErrorLib",
+              url: "https://errorlib.net",
+              description: "Industrial Fault Code Library with troubleshooting guides for ABB, Siemens, Danfoss, Yaskawa and more.",
+              publisher: {
+                "@type": "Organization",
+                name: "ErrorLib",
+                url: "https://errorlib.net",
+              },
+            }),
+          }}
+        />
         <header className="bg-technical-900">
           <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
             <a href="/" className="flex items-center gap-2.5">
