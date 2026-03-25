@@ -23,6 +23,7 @@ import {
   markBrandCompleted,
   getMinedUrlsForBrand,
 } from "./lib/cache.js";
+import { notifyUsersForBrand } from "./lib/notify.js";
 
 const MAX_PDFS = 5;
 const MAX_PAGES_PER_PDF = 15;
@@ -543,6 +544,14 @@ async function runBrandList(
         codes: count,
         status: count > 0 ? "OK" : "EMPTY",
       });
+
+      if (count > 0) {
+        try {
+          await notifyUsersForBrand(brand);
+        } catch (notifyErr) {
+          log.warn(`[NOTIFY] Error: ${notifyErr}`);
+        }
+      }
 
       if (queueId) {
         await setQueueStatus(queueId, "completed");

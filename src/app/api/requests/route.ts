@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sendAdminAlert } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { brand, model } = body as { brand?: string; model?: string };
+    const { brand, model, email } = body as {
+      brand?: string;
+      model?: string;
+      email?: string;
+    };
 
     if (!brand || brand.trim().length === 0) {
       return NextResponse.json(
@@ -15,8 +20,8 @@ export async function POST(req: NextRequest) {
 
     const cleanBrand = brand.trim();
     const cleanModel = model?.trim() || null;
+    const cleanEmail = email?.trim() || null;
 
-    // Check for existing request with same brand (and model if provided)
     const existing = await prisma.userRequest.findFirst({
       where: {
         brand: { equals: cleanBrand, mode: "insensitive" },
@@ -30,8 +35,14 @@ export async function POST(req: NextRequest) {
     if (existing) {
       const updated = await prisma.userRequest.update({
         where: { id: existing.id },
-        data: { voteCount: { increment: 1 } },
+        data: {
+          voteCount: { increment: 1 },
+          ...(cleanEmail && !existing.email ? { email: cleanEmail } : {}),
+        },
       });
+
+      sendAdminAlert(cleanBrand, cleanModel, cleanEmail).catch(() => {});
+
       return NextResponse.json({
         action: "voted",
         voteCount: updated.voteCount,
@@ -42,10 +53,13 @@ export async function POST(req: NextRequest) {
       data: {
         brand: cleanBrand,
         model: cleanModel,
+        email: cleanEmail,
         status: "pending",
         voteCount: 1,
       },
     });
+
+    sendAdminAlert(cleanBrand, cleanModel, cleanEmail).catch(() => {});
 
     return NextResponse.json({ action: "created" }, { status: 201 });
   } catch {
