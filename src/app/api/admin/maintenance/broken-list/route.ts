@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import crypto from "crypto";
+
+function isAdmin(token: string | undefined): boolean {
+  const pw = process.env.ADMIN_PASSWORD;
+  if (!pw || !token) return false;
+  return token === crypto.createHmac("sha256", pw).update("errorlib-admin").digest("hex");
+}
 
 export async function GET() {
   const cookieStore = await cookies();
-  if (cookieStore.get("admin_auth")?.value !== "true") {
+  if (!isAdmin(cookieStore.get("admin_token")?.value)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

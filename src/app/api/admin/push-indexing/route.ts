@@ -2,9 +2,17 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { google } from "googleapis";
+import crypto from "crypto";
 
 const BASE_URL = process.env.SITE_URL || "https://errorlib.net";
 const BATCH_SIZE = 100;
+
+function isAdmin(token: string | undefined): boolean {
+  const pw = process.env.ADMIN_PASSWORD;
+  if (!pw || !token) return false;
+  const expected = crypto.createHmac("sha256", pw).update("errorlib-admin").digest("hex");
+  return token === expected;
+}
 
 function getAuth() {
   const keyJson = process.env.GOOGLE_INDEXING_KEY;
@@ -19,7 +27,7 @@ function getAuth() {
 
 export async function GET() {
   const jar = await cookies();
-  if (jar.get("admin_token")?.value !== process.env.ADMIN_PASSWORD) {
+  if (!isAdmin(jar.get("admin_token")?.value)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -31,7 +39,7 @@ export async function GET() {
 
 export async function POST() {
   const jar = await cookies();
-  if (jar.get("admin_token")?.value !== process.env.ADMIN_PASSWORD) {
+  if (!isAdmin(jar.get("admin_token")?.value)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
