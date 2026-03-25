@@ -1,11 +1,13 @@
 import "dotenv/config";
 import { google } from "googleapis";
 import { PrismaClient } from "../generated/prisma/client.js";
+import { PrismaNeon } from "@prisma/adapter-neon";
 
 const BASE_URL = process.env.SITE_URL || "https://errorlib.net";
 const BATCH_SIZE = 100;
 
-const prisma = new PrismaClient();
+const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! });
+const prisma = new PrismaClient({ adapter });
 
 async function getAuth() {
   const keyJson = process.env.GOOGLE_INDEXING_KEY;
