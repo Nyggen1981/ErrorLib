@@ -1,5 +1,3 @@
-import { cookies } from "next/headers";
-
 export type Locale = "en" | "no" | "de" | "es";
 
 export const LOCALES: { code: Locale; label: string }[] = [
@@ -8,13 +6,6 @@ export const LOCALES: { code: Locale; label: string }[] = [
   { code: "de", label: "DE" },
   { code: "es", label: "ES" },
 ];
-
-export async function getLocale(): Promise<Locale> {
-  const jar = await cookies();
-  const val = jar.get("lang")?.value;
-  if (val && ["en", "no", "de", "es"].includes(val)) return val as Locale;
-  return "en";
-}
 
 const dict = {
   // ─── Layout / Header / Footer ───

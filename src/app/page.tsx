@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { getLocale, t } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
+import { getLocale } from "@/lib/locale";
 import { RequestForm } from "./request-form";
 
 export const dynamic = "force-dynamic";

@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FaultCodeCard } from "@/components/FaultCodeCard";
-import { getLocale, t } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
+import { getLocale } from "@/lib/locale";
 import type { Metadata } from "next";
 
 type Props = { params: Promise<{ brandSlug: string; manualSlug: string }> };

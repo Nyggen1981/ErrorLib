@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { getLocale, t } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
+import { getLocale } from "@/lib/locale";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import "./globals.css";
 
