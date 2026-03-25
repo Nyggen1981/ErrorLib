@@ -2,7 +2,7 @@ import { Resend } from "resend";
 import { getPrisma } from "./db.js";
 import { log } from "./logger.js";
 
-const FROM_ADDRESS = process.env.RESEND_FROM_ADDRESS || "ErrorLib <onboarding@resend.dev>";
+const FROM_ADDRESS = "ErrorLib <notifications@errorlib.net>";
 
 export async function notifyUsersForBrand(brand: string): Promise<number> {
   const apiKey = process.env.RESEND_API_KEY;
