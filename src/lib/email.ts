@@ -1,9 +1,13 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const ADMIN_EMAIL = "kjetilnygard@hotmail.com";
 const FROM_ADDRESS = "ErrorLib <notifications@errorlib.net>";
+
+function getResend() {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error("RESEND_API_KEY is not set");
+  return new Resend(key);
+}
 
 export async function sendAdminAlert(
   brand: string,
@@ -11,7 +15,7 @@ export async function sendAdminAlert(
   userEmail: string | null
 ) {
   try {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: FROM_ADDRESS,
       to: ADMIN_EMAIL,
       subject: `New Brand Request: ${brand}`,
@@ -40,7 +44,7 @@ export async function sendBrandLiveNotification(
 
   for (const email of emails) {
     try {
-      await resend.emails.send({
+      await getResend().emails.send({
         from: FROM_ADDRESS,
         to: email,
         subject: `${brand} documentation is now live on ErrorLib`,

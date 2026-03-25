@@ -64,7 +64,7 @@ export default function RootLayout({
         <main>{children}</main>
         <footer className="bg-technical-900 text-technical-500">
           <div className="mx-auto max-w-6xl px-4 py-5 text-center text-xs sm:px-6">
-            ErrorLib &mdash; Industrial Fault Code Reference
+            ErrorLib &mdash; Industrial Fault Code Library
           </div>
         </footer>
       </body>
