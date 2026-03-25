@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://errorlib.net"),
   title: {
     default: "ErrorLib - Industrial Fault Code Library",
     template: "%s | ErrorLib",
@@ -12,6 +13,9 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     siteName: "ErrorLib",
+  },
+  alternates: {
+    canonical: "/",
   },
 };
 

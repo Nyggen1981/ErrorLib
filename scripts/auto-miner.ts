@@ -631,7 +631,7 @@ async function runBrandList(
   log.info(`  Manuals:     ${dbManuals}`);
   log.info(`  Fault codes: ${dbFaults}`);
   log.info("");
-  log.info("Site is live at: https://error-lib.vercel.app");
+  log.info("Site is live at: https://errorlib.net");
 }
 
 async function main() {
