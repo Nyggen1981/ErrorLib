@@ -1,45 +1,99 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+type FaultCodeSelect = {
+  code: string;
+  title: string;
+  slug: string;
+  manual: {
+    slug: string;
+    name: string;
+    brand: { name: string; slug: string };
+  };
+};
+
+const FC_SELECT = {
+  code: true,
+  title: true,
+  slug: true,
+  manual: {
+    select: {
+      slug: true,
+      name: true,
+      brand: { select: { name: true, slug: true } },
+    },
+  },
+} as const;
+
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim();
   if (!q || q.length < 2) {
     return NextResponse.json({ results: [] });
   }
 
-  const [faultCodes, brands] = await Promise.all([
-    prisma.faultCode.findMany({
+  const words = q.split(/\s+/).filter((w) => w.length >= 2);
+
+  const allBrands = await prisma.brand.findMany({
+    select: { name: true, slug: true, _count: { select: { manuals: true } } },
+  });
+
+  const brandMatch = allBrands.find((b) =>
+    words.some((w) => b.name.toLowerCase().includes(w.toLowerCase()))
+  );
+
+  const remainingWords = brandMatch
+    ? words.filter(
+        (w) => !brandMatch.name.toLowerCase().includes(w.toLowerCase())
+      )
+    : words;
+
+  let faultCodes: FaultCodeSelect[];
+
+  if (brandMatch && remainingWords.length > 0) {
+    const keyword = remainingWords.join(" ");
+    faultCodes = await prisma.faultCode.findMany({
+      where: {
+        manual: { brand: { slug: brandMatch.slug } },
+        OR: [
+          { code: { contains: keyword, mode: "insensitive" } },
+          { title: { contains: keyword, mode: "insensitive" } },
+          { description: { contains: keyword, mode: "insensitive" } },
+        ],
+      },
+      select: FC_SELECT,
+      take: 20,
+      orderBy: { code: "asc" },
+    });
+  } else if (brandMatch && remainingWords.length === 0) {
+    faultCodes = await prisma.faultCode.findMany({
+      where: { manual: { brand: { slug: brandMatch.slug } } },
+      select: FC_SELECT,
+      take: 20,
+      orderBy: { code: "asc" },
+    });
+  } else {
+    faultCodes = await prisma.faultCode.findMany({
       where: {
         OR: [
           { code: { contains: q, mode: "insensitive" } },
           { title: { contains: q, mode: "insensitive" } },
+          ...words.flatMap((w) => [
+            { code: { contains: w, mode: "insensitive" as const } },
+            { title: { contains: w, mode: "insensitive" as const } },
+          ]),
         ],
       },
-      select: {
-        code: true,
-        title: true,
-        slug: true,
-        manual: {
-          select: {
-            slug: true,
-            name: true,
-            brand: { select: { name: true, slug: true } },
-          },
-        },
-      },
+      select: FC_SELECT,
       take: 20,
       orderBy: { code: "asc" },
-    }),
-    prisma.brand.findMany({
-      where: { name: { contains: q, mode: "insensitive" } },
-      select: {
-        name: true,
-        slug: true,
-        _count: { select: { manuals: true } },
-      },
-      take: 5,
-    }),
-  ]);
+    });
+  }
+
+  const matchedBrands = brandMatch
+    ? [brandMatch]
+    : allBrands.filter((b) =>
+        b.name.toLowerCase().includes(q.toLowerCase())
+      );
 
   const grouped: Record<
     string,
@@ -66,7 +120,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const totalResults = faultCodes.length + brands.length;
+  const totalResults = faultCodes.length + matchedBrands.length;
 
   prisma.searchLog
     .create({ data: { query: q, results: totalResults } })
@@ -74,7 +128,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     results: {
-      brands: brands.map((b) => ({
+      brands: matchedBrands.slice(0, 5).map((b) => ({
         name: b.name,
         slug: b.slug,
         manualCount: b._count.manuals,
