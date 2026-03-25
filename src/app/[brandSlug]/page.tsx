@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { SeriesFaultList } from "@/components/SeriesFaultList";
+import type { SeriesFaultItem } from "@/components/SeriesFaultList";
 import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
+import type { Locale } from "@/lib/i18n";
 import type { Metadata } from "next";
 
 type Props = {
@@ -23,6 +26,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: { title, description, type: "website", url: `/${brand.slug}` },
   };
 }
+
+// ── Types ──
 
 type ManualWithCount = {
   id: string;
@@ -127,7 +132,6 @@ function groupManuals(manuals: ManualWithCount[], brandName: string): SeriesGrou
     }
   }
 
-  // Merge generic-named groups into the largest real group
   const generics: SeriesGroup[] = [];
   const real: SeriesGroup[] = [];
 
@@ -152,6 +156,27 @@ function groupManuals(manuals: ManualWithCount[], brandName: string): SeriesGrou
   return real.sort((a, b) => b.totalCodes - a.totalCodes);
 }
 
+// ── Manual priority for deduplication (higher = preferred) ──
+
+const TAG_PRIORITY: Record<string, number> = {
+  firmware: 10,
+  "standard control program": 9,
+  primary: 8,
+  "control program": 7,
+  software: 6,
+  hardware: 5,
+  safety: 4,
+  general: 3,
+};
+
+function tagPriority(label: string): number {
+  const lower = label.toLowerCase();
+  for (const [key, val] of Object.entries(TAG_PRIORITY)) {
+    if (lower.includes(key)) return val;
+  }
+  return 1;
+}
+
 // ── Arrow icon ──
 
 function ArrowIcon() {
@@ -161,6 +186,26 @@ function ArrowIcon() {
     </svg>
   );
 }
+
+// ── Localization helper ──
+
+type TranslationEntry = { title?: string; description?: string };
+type TranslationsMap = Record<string, TranslationEntry>;
+
+function localized(
+  fc: { title: string; description: string; translations: unknown },
+  locale: Locale
+) {
+  if (locale === "en") return { title: fc.title, description: fc.description };
+  const map = (fc.translations as TranslationsMap) ?? {};
+  const tr = map[locale];
+  return {
+    title: tr?.title || fc.title,
+    description: tr?.description || fc.description,
+  };
+}
+
+// ── Page ──
 
 export default async function BrandPage({ params, searchParams }: Props) {
   const { brandSlug } = await params;
@@ -182,12 +227,76 @@ export default async function BrandPage({ params, searchParams }: Props) {
   const groups = groupManuals(brand.manuals, brand.name);
   const totalCodes = groups.reduce((s, g) => s + g.totalCodes, 0);
 
-  // ── Series Landing View ──
+  // ── Series Fault-Code List ──
   if (seriesFilter) {
     const group = groups.find(
       (g) => g.series.toLowerCase() === seriesFilter.toLowerCase()
     );
     if (!group) notFound();
+
+    const manualIds = group.manuals.map((m) => m.manual.id);
+    const labelById = new Map(
+      group.manuals.map((m) => [m.manual.id, m.label])
+    );
+    const priorityById = new Map(
+      group.manuals.map((m) => [m.manual.id, tagPriority(m.label)])
+    );
+    const slugById = new Map(
+      group.manuals.map((m) => [m.manual.id, m.manual.slug])
+    );
+
+    const rawCodes = await prisma.faultCode.findMany({
+      where: { manualId: { in: manualIds } },
+      orderBy: { code: "asc" },
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        description: true,
+        slug: true,
+        translations: true,
+        manualId: true,
+      },
+    });
+
+    // Deduplicate: keep highest-priority manual per fault code
+    const deduped = new Map<
+      string,
+      (typeof rawCodes)[number] & { priority: number }
+    >();
+
+    for (const fc of rawCodes) {
+      const key = fc.code.toLowerCase();
+      const priority = priorityById.get(fc.manualId) ?? 0;
+      const existing = deduped.get(key);
+      if (!existing || priority > existing.priority) {
+        deduped.set(key, { ...fc, priority });
+      }
+    }
+
+    const codes = Array.from(deduped.values()).sort((a, b) =>
+      a.code.localeCompare(b.code, undefined, { numeric: true })
+    );
+
+    // Build filter tags (only include tags that survived dedup)
+    const usedTags = new Set(codes.map((fc) => labelById.get(fc.manualId) ?? "General"));
+    const tags = group.manuals
+      .map((m) => m.label)
+      .filter((label, i, arr) => arr.indexOf(label) === i && usedTags.has(label))
+      .sort((a, b) => (tagPriority(b) - tagPriority(a)));
+
+    const items: SeriesFaultItem[] = codes.map((fc) => {
+      const loc = localized(fc, locale);
+      const manualSlug = slugById.get(fc.manualId) ?? "";
+      return {
+        id: fc.id,
+        code: fc.code,
+        title: loc.title,
+        description: loc.description,
+        href: `/${brand.slug}/${manualSlug}/${fc.slug}`,
+        tag: labelById.get(fc.manualId) ?? "General",
+      };
+    });
 
     return (
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
@@ -199,41 +308,22 @@ export default async function BrandPage({ params, searchParams }: Props) {
           ]}
         />
 
-        <div className="mb-6">
+        <div className="mb-5">
           <h1 className="text-2xl font-bold tracking-tight text-technical-50 sm:text-3xl">
             {brand.name} {group.series}
           </h1>
           <p className="mt-1 text-sm text-technical-300">
-            {group.manuals.length}{" "}
-            {group.manuals.length === 1 ? t("manual", locale) : t("manuals", locale)}
-            {" \u00B7 "}
-            {group.totalCodes} {t("faultCodes", locale)}
+            {codes.length}{" "}
+            {codes.length === 1 ? t("faultCode", locale) : t("faultCodes", locale)}{" "}
+            {t("documented", locale)}
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          {group.manuals
-            .sort((a, b) => b.manual._count.faultCodes - a.manual._count.faultCodes)
-            .map(({ manual, label }) => (
-              <a
-                key={manual.id}
-                href={`/${brand.slug}/${manual.slug}`}
-                className="group flex items-center justify-between rounded-lg border border-technical-700 bg-technical-800 p-5 transition-all hover:border-technical-500 hover:bg-technical-700"
-              >
-                <div className="min-w-0">
-                  <h2 className="font-semibold text-technical-50 transition-colors group-hover:text-accent">
-                    {label}
-                  </h2>
-                  <p className="mt-0.5 text-xs text-technical-400">
-                    {manual._count.faultCodes} {t("faultCodes", locale)}
-                  </p>
-                </div>
-                <div className="ml-3 shrink-0 text-accent opacity-0 transition group-hover:opacity-100">
-                  <ArrowIcon />
-                </div>
-              </a>
-            ))}
-        </div>
+        <SeriesFaultList
+          items={items}
+          tags={tags}
+          allLabel={t("filterAll", locale)}
+        />
       </div>
     );
   }
@@ -259,13 +349,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
       {groups.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {groups.map((group) => {
-            const hasSingle = group.manuals.length === 1;
-            const primary = group.manuals.reduce((best, m) =>
-              m.manual._count.faultCodes > best.manual._count.faultCodes ? m : best
-            );
-            const href = hasSingle
-              ? `/${brand.slug}/${primary.manual.slug}`
-              : `/${brand.slug}?series=${encodeURIComponent(group.series)}`;
+            const href = `/${brand.slug}?series=${encodeURIComponent(group.series)}`;
 
             return (
               <a
