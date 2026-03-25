@@ -49,26 +49,26 @@ export function RequestForm() {
   const showSuccess = status === "created" || status === "voted";
 
   return (
-    <section className="mt-16">
-      <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-8">
+    <section className="hero-grid bg-technical-800 px-4 py-14 sm:px-6">
+      <div className="mx-auto max-w-6xl">
         <div className="mx-auto max-w-xl text-center">
-          <h2 className="text-xl font-semibold text-technical-800">
+          <h2 className="text-xl font-semibold text-white">
             Missing a manual?
           </h2>
-          <p className="mt-2 text-sm text-technical-500">
+          <p className="mt-2 text-sm text-technical-400">
             Submit a request and our team will prioritize adding it to our
             technical library.
           </p>
         </div>
 
         {showSuccess ? (
-          <div className="mx-auto mt-6 max-w-md rounded-xl border border-success/30 bg-success/5 p-5 text-center">
+          <div className="mx-auto mt-6 max-w-md rounded-xl border border-success/20 bg-success/10 p-5 text-center">
             <p className="font-medium text-success">
               {status === "voted"
                 ? `Thanks! This request now has ${voteCount} votes.`
                 : "Thank you! We'll look into it."}
             </p>
-            <p className="mt-1 text-sm text-technical-500">
+            <p className="mt-1 text-sm text-technical-400">
               Popular requests are prioritized by our team.
             </p>
             <button
@@ -89,14 +89,14 @@ export function RequestForm() {
               onChange={(e) => setBrand(e.target.value)}
               placeholder="Brand (e.g. Mitsubishi)"
               required
-              className="flex-1 rounded-lg border border-technical-200 bg-white px-4 py-2.5 text-sm text-technical-800 placeholder-technical-400 outline-none transition focus:border-accent focus:ring-1 focus:ring-accent/30"
+              className="flex-1 rounded-lg border border-technical-600 bg-technical-900 px-4 py-2.5 text-sm text-white placeholder-technical-500 outline-none transition focus:border-accent focus:ring-1 focus:ring-accent/30"
             />
             <input
               type="text"
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="Model (optional)"
-              className="flex-1 rounded-lg border border-technical-200 bg-white px-4 py-2.5 text-sm text-technical-800 placeholder-technical-400 outline-none transition focus:border-accent focus:ring-1 focus:ring-accent/30"
+              className="flex-1 rounded-lg border border-technical-600 bg-technical-900 px-4 py-2.5 text-sm text-white placeholder-technical-500 outline-none transition focus:border-accent focus:ring-1 focus:ring-accent/30"
             />
             <button
               type="submit"

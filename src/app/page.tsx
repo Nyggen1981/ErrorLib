@@ -156,8 +156,9 @@ export default async function HomePage() {
           </section>
         )}
 
-        <RequestForm />
       </div>
+
+      <RequestForm />
     </>
   );
 }
