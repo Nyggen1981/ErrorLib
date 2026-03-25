@@ -68,12 +68,15 @@ export default async function HomePage() {
             <SearchBar variant="hero" locale={locale} />
           </div>
           {totalCodes > 0 && (
-            <div className="mt-4 flex items-center justify-center gap-4 text-sm">
+            <div className="mt-4 flex items-center justify-center gap-3 text-sm">
               <span className="rounded-full border border-technical-600 px-3 py-1 font-medium tabular-nums text-technical-200">
                 {totalCodes.toLocaleString()} {t("faultCodes", locale)}
               </span>
               <span className="rounded-full border border-technical-600 px-3 py-1 font-medium tabular-nums text-technical-200">
                 {activeBrands.length} {t("brands", locale).toLowerCase()}
+              </span>
+              <span className="animate-pulse-subtle text-xs text-accent-dark">
+                {t("andCounting", locale)}
               </span>
             </div>
           )}

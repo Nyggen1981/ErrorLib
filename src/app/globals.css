@@ -33,6 +33,15 @@ body {
   line-height: 1.6;
 }
 
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s ease-in-out infinite;
+}
+
 .hero-grid {
   background-image:
     linear-gradient(rgba(212 157 0 / 0.03) 1px, transparent 1px),

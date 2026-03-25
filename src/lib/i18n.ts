@@ -146,6 +146,7 @@ const dict = {
     de: "Noch keine Fehlercodes für dieses Handbuch extrahiert.",
     es: "Aún no se han extraído códigos de falla para este manual.",
   },
+  andCounting: { en: "...and counting", no: "...og flere kommer", de: "...und es werden mehr", es: "...y sumando" },
   home: { en: "Home", no: "Hjem", de: "Startseite", es: "Inicio" },
   includes: { en: "Includes", no: "Inkluderer", de: "Beinhaltet", es: "Incluye" },
   viewCodes: { en: "View fault codes", no: "Se feilkoder", de: "Fehlercodes anzeigen", es: "Ver códigos de falla" },

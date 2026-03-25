@@ -5,7 +5,10 @@ import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
 import type { Metadata } from "next";
 
-type Props = { params: Promise<{ brandSlug: string }> };
+type Props = {
+  params: Promise<{ brandSlug: string }>;
+  searchParams: Promise<{ series?: string }>;
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { brandSlug } = await params;
@@ -47,15 +50,27 @@ const SERIES_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
   [/\b(SINUMERIK)\s+(\w+)/i, (m) => `SINUMERIK ${m[2]}`],
   [/\b(MOVIDRIVE)\b/i, () => "MOVIDRIVE"],
   [/\b(MOVIFIT)\b/i, () => "MOVIFIT"],
+  [/\b(MCBSM)\b/i, () => "MCBSM"],
   [/\b(Altivar|ALTIVAR|ATV)\s*(\d+)/i, (m) => `Altivar ${m[2]}`],
   [/\b(Altistart)\s*(\d+)/i, (m) => `Altistart ${m[2]}`],
+  [/\b(XW\s*Pro)\b/i, () => "XW Pro"],
   [/\b(TwinCAT)\s*(\d*)/i, (m) => m[2] ? `TwinCAT ${m[2]}` : "TwinCAT"],
   [/\b(TwinSAFE)\b/i, () => "TwinSAFE"],
-  [/\b(FR[-\s]?[A-Z]\d{3})/i, (m) => m[1].replace(/\s+/g, "").toUpperCase()],
+  [/\b(FR[-\s]?[A-Z]\d{3})/i, (m) => m[1].replace(/\s+/g, "").replace(/-/g, "-").toUpperCase()],
   [/\b(NXS|NXP)\b/i, () => "NXS/NXP"],
   [/\b(MX2)\b/i, () => "MX2"],
-  [/\b([A-Z]\d{3,4})\s/i, (m) => m[1].toUpperCase()],
+  [/\b(SXF)\b/i, () => "SXF"],
+  [/\b(3G3EV)\b/i, () => "3G3EV"],
+  [/\b(BP\d{3})/i, (m) => m[1].toUpperCase()],
+  [/\b(MSZ[-\s]?\w+)/i, (m) => m[1].replace(/\s+/g, "").toUpperCase()],
+  [/\b(PUZ[-\s]?\w+)/i, (m) => m[1].replace(/\s+/g, "").toUpperCase()],
+  [/\b([A-Z]\d{3,4})\b/i, (m) => m[1].toUpperCase()],
 ];
+
+const GENERIC_NAMES = new Set([
+  "system", "general", "other", "misc", "unknown",
+  "diagnostics", "alarms", "faults", "list",
+]);
 
 function extractSeries(manualName: string, brandName: string): string {
   const stripped = manualName
@@ -112,11 +127,44 @@ function groupManuals(manuals: ManualWithCount[], brandName: string): SeriesGrou
     }
   }
 
-  return Array.from(groups.values()).sort((a, b) => b.totalCodes - a.totalCodes);
+  // Merge generic-named groups into the largest real group
+  const generics: SeriesGroup[] = [];
+  const real: SeriesGroup[] = [];
+
+  for (const group of groups.values()) {
+    if (GENERIC_NAMES.has(group.series.toLowerCase())) {
+      generics.push(group);
+    } else {
+      real.push(group);
+    }
+  }
+
+  if (generics.length > 0 && real.length > 0) {
+    const largest = real.reduce((a, b) => (a.totalCodes >= b.totalCodes ? a : b));
+    for (const g of generics) {
+      largest.manuals.push(...g.manuals);
+      largest.totalCodes += g.totalCodes;
+    }
+  } else if (generics.length > 0) {
+    real.push(...generics);
+  }
+
+  return real.sort((a, b) => b.totalCodes - a.totalCodes);
 }
 
-export default async function BrandPage({ params }: Props) {
+// ── Arrow icon ──
+
+function ArrowIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+    </svg>
+  );
+}
+
+export default async function BrandPage({ params, searchParams }: Props) {
   const { brandSlug } = await params;
+  const { series: seriesFilter } = await searchParams;
   const locale = await getLocale();
 
   const brand = await prisma.brand.findUnique({
@@ -134,6 +182,63 @@ export default async function BrandPage({ params }: Props) {
   const groups = groupManuals(brand.manuals, brand.name);
   const totalCodes = groups.reduce((s, g) => s + g.totalCodes, 0);
 
+  // ── Series Landing View ──
+  if (seriesFilter) {
+    const group = groups.find(
+      (g) => g.series.toLowerCase() === seriesFilter.toLowerCase()
+    );
+    if (!group) notFound();
+
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        <Breadcrumbs
+          items={[
+            { label: t("home", locale), href: "/" },
+            { label: brand.name, href: `/${brand.slug}` },
+            { label: group.series },
+          ]}
+        />
+
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold tracking-tight text-technical-50 sm:text-3xl">
+            {brand.name} {group.series}
+          </h1>
+          <p className="mt-1 text-sm text-technical-300">
+            {group.manuals.length}{" "}
+            {group.manuals.length === 1 ? t("manual", locale) : t("manuals", locale)}
+            {" \u00B7 "}
+            {group.totalCodes} {t("faultCodes", locale)}
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {group.manuals
+            .sort((a, b) => b.manual._count.faultCodes - a.manual._count.faultCodes)
+            .map(({ manual, label }) => (
+              <a
+                key={manual.id}
+                href={`/${brand.slug}/${manual.slug}`}
+                className="group flex items-center justify-between rounded-lg border border-technical-700 bg-technical-800 p-5 transition-all hover:border-technical-500 hover:bg-technical-700"
+              >
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-technical-50 transition-colors group-hover:text-accent">
+                    {label}
+                  </h2>
+                  <p className="mt-0.5 text-xs text-technical-400">
+                    {manual._count.faultCodes} {t("faultCodes", locale)}
+                  </p>
+                </div>
+                <div className="ml-3 shrink-0 text-accent opacity-0 transition group-hover:opacity-100">
+                  <ArrowIcon />
+                </div>
+              </a>
+            ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main Grid View ──
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
       <Breadcrumbs
@@ -152,63 +257,42 @@ export default async function BrandPage({ params }: Props) {
       </div>
 
       {groups.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {groups.map((group) => {
-            const hasSingleManual = group.manuals.length === 1;
+            const hasSingle = group.manuals.length === 1;
             const primary = group.manuals.reduce((best, m) =>
               m.manual._count.faultCodes > best.manual._count.faultCodes ? m : best
             );
+            const href = hasSingle
+              ? `/${brand.slug}/${primary.manual.slug}`
+              : `/${brand.slug}?series=${encodeURIComponent(group.series)}`;
 
             return (
-              <div
+              <a
                 key={group.series}
-                className="rounded-lg border border-technical-700 bg-technical-800 p-5"
+                href={href}
+                className="group flex items-center justify-between rounded-lg border border-technical-700 bg-technical-800 p-5 transition-all hover:border-technical-500 hover:bg-technical-700"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-xl font-bold tracking-tight text-technical-50">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-bold tracking-tight text-technical-50 transition-colors group-hover:text-accent">
                     {group.series}
                   </h2>
-                  <span className="shrink-0 rounded bg-accent/15 px-2.5 py-0.5 text-sm font-bold tabular-nums text-accent">
+                  <p className="mt-0.5 text-xs text-technical-400">
+                    {group.manuals.length}{" "}
+                    {group.manuals.length === 1
+                      ? t("manual", locale)
+                      : t("manuals", locale)}
+                  </p>
+                </div>
+                <div className="ml-3 flex shrink-0 items-center gap-3">
+                  <span className="rounded bg-accent/15 px-2.5 py-1 text-sm font-bold tabular-nums text-accent">
                     {group.totalCodes}
                   </span>
+                  <span className="text-accent opacity-0 transition group-hover:opacity-100">
+                    <ArrowIcon />
+                  </span>
                 </div>
-
-                <p className="mt-1 text-xs text-technical-400">
-                  {group.manuals.length}{" "}
-                  {group.manuals.length === 1 ? t("manual", locale) : t("manuals", locale)}
-                  {" \u00B7 "}
-                  {group.totalCodes} {t("faultCodes", locale)}
-                </p>
-
-                {hasSingleManual ? (
-                  <a
-                    href={`/${brand.slug}/${primary.manual.slug}`}
-                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-accent transition hover:text-accent/80"
-                  >
-                    {t("viewCodes", locale)}
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                    </svg>
-                  </a>
-                ) : (
-                  <div className="mt-3 space-y-1">
-                    {group.manuals
-                      .sort((a, b) => b.manual._count.faultCodes - a.manual._count.faultCodes)
-                      .map(({ manual, label }) => (
-                        <a
-                          key={manual.id}
-                          href={`/${brand.slug}/${manual.slug}`}
-                          className="flex items-center justify-between rounded-md border border-technical-600 bg-technical-900/50 px-3 py-2 text-sm transition hover:border-technical-500 hover:bg-technical-700"
-                        >
-                          <span className="truncate text-technical-200">{label}</span>
-                          <span className="ml-2 shrink-0 text-xs tabular-nums text-technical-400">
-                            {manual._count.faultCodes}
-                          </span>
-                        </a>
-                      ))}
-                  </div>
-                )}
-              </div>
+              </a>
             );
           })}
         </div>
