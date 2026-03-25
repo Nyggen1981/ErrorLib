@@ -230,15 +230,16 @@ export function SearchBar({
                       key={fc.href}
                       href={fc.href}
                       onClick={() => { logSearch(query, group.codes.length); setOpen(false); }}
-                      className="flex items-center rounded-lg px-3 py-2 transition hover:bg-technical-800"
+                      className="rounded-lg px-3 py-2 transition hover:bg-technical-800"
+                      style={{ display: "grid", gridTemplateColumns: "60px 1fr", columnGap: 16, alignItems: "center" }}
                     >
                       <span
-                        className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded bg-technical-700 py-0.5 font-mono text-xs font-bold text-accent"
-                        style={{ width: 60, minWidth: 60, maxWidth: 60 }}
+                        className="overflow-hidden rounded bg-technical-700 py-0.5 font-mono text-xs font-bold text-accent"
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", width: 60, minWidth: 60, maxWidth: 60 }}
                       >
                         <span className="truncate px-1">{fc.code}</span>
                       </span>
-                      <div className="min-w-0" style={{ marginLeft: 16 }}>
+                      <div className="overflow-hidden">
                         <p className="truncate text-sm text-technical-300">
                           {fc.title}
                         </p>
