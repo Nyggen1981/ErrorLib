@@ -8,6 +8,7 @@ import {
   TranslatedPrioritySteps,
   TranslatedMoreSteps,
   TranslatedFullSteps,
+  HasFullSteps,
   TranslatingBanner,
 } from "@/components/FaultCodeContent";
 import { AdSlot } from "@/components/AdSlot";
@@ -215,12 +216,14 @@ export default async function FaultCodePage({ params }: Props) {
             <TranslatedDescription />
           </section>
 
-          <section className="rounded-lg border border-technical-700 bg-technical-800 p-5 sm:p-6">
-            <h2 className="mb-4 text-lg font-bold text-technical-50">
-              {t("completeGuide", locale)}
-            </h2>
-            <TranslatedFullSteps />
-          </section>
+          <HasFullSteps>
+            <section className="rounded-lg border border-technical-700 bg-technical-800 p-5 sm:p-6">
+              <h2 className="mb-4 text-lg font-bold text-technical-50">
+                {t("completeGuide", locale)}
+              </h2>
+              <TranslatedFullSteps />
+            </section>
+          </HasFullSteps>
 
           <AdSlot slot="content" />
         </div>
