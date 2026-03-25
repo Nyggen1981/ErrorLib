@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ContactEmail } from "@/components/ContactEmail";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -116,13 +117,7 @@ export default function TermsPage() {
         <h2>10. Contact</h2>
         <p>
           For questions about these terms, contact us at{" "}
-          <a
-            href="mailto:legal@errorlib.net"
-            className="text-accent hover:underline"
-          >
-            legal@errorlib.net
-          </a>
-          .
+          <ContactEmail display="legal@errorlib.net" />.
         </p>
       </div>
     </div>

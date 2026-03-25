@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ContactEmail } from "@/components/ContactEmail";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -101,13 +102,7 @@ export default function PrivacyPage() {
         <h2>9. Contact</h2>
         <p>
           For questions about this privacy policy, contact us at{" "}
-          <a
-            href="mailto:privacy@errorlib.net"
-            className="text-accent hover:underline"
-          >
-            privacy@errorlib.net
-          </a>
-          .
+          <ContactEmail display="privacy@errorlib.net" />.
         </p>
       </div>
     </div>

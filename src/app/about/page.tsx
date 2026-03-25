@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ContactEmail } from "@/components/ContactEmail";
 
 export const metadata: Metadata = {
   title: "About ErrorLib",
@@ -81,13 +82,7 @@ export default function AboutPage() {
           </h2>
           <p>
             For inquiries, partnerships, or feedback, reach us at{" "}
-            <a
-              href="mailto:contact@errorlib.net"
-              className="text-accent hover:underline"
-            >
-              contact@errorlib.net
-            </a>
-            .
+            <ContactEmail display="contact@errorlib.net" />.
           </p>
         </div>
       </div>
