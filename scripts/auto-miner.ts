@@ -27,6 +27,7 @@ import {
 const MAX_PDFS = 5;
 const MAX_PAGES_PER_PDF = 15;
 const COOLDOWN_BETWEEN_BRANDS_MS = 10_000;
+const QUEUE_POLL_INTERVAL_MS = 30_000;
 const BRAND_DUPLICATE_THRESHOLD = 20;
 
 const AUTO_BRANDS = [
@@ -115,23 +116,22 @@ function hasQueueFlag(): boolean {
   return process.argv.slice(2).some((a) => a === "--queue" || a === "-q");
 }
 
-async function fetchQueueBrands(): Promise<
-  { id: string; brandName: string }[]
-> {
+async function resetStaleQueueItems(): Promise<void> {
   const prisma = getPrisma();
-
-  // Reset stale "processing" queue items from interrupted runs
   await prisma.miningQueue.updateMany({
     where: { status: "processing" },
     data: { status: "pending" },
   });
-
-  // Mark stale "started" mining logs as aborted
   await prisma.miningLog.updateMany({
     where: { status: "started" },
     data: { status: "aborted", message: "Miner was interrupted" },
   });
+}
 
+async function fetchQueueBrands(): Promise<
+  { id: string; brandName: string }[]
+> {
+  const prisma = getPrisma();
   return prisma.miningQueue.findMany({
     where: { status: "pending" },
     orderBy: { createdAt: "asc" },
@@ -639,25 +639,38 @@ async function main() {
   const force = hasForceFlag();
   const useQueue = hasQueueFlag();
 
-  // ─── QUEUE MODE: Pull pending brands from the database ───
+  // ─── QUEUE MODE: Continuous loop pulling pending brands ───
   if (useQueue) {
-    const queueItems = await fetchQueueBrands();
+    log.banner("QUEUE MINER (continuous)");
+    log.info("Resetting stale queue items from previous runs...");
+    await resetStaleQueueItems();
+    log.info("Watching for new brands in the mining queue...");
+    log.info("Add brands via the Admin Dashboard at /admin");
+    log.info(`Poll interval: ${QUEUE_POLL_INTERVAL_MS / 1000}s`);
+    log.info("Press Ctrl+C to stop.\n");
 
-    if (queueItems.length === 0) {
-      log.banner("QUEUE MINING");
-      log.info("No pending brands in the queue.");
-      log.info("Add brands via the Admin Dashboard at /admin");
-      await disconnect();
-      return;
+    while (true) {
+      const queueItems = await fetchQueueBrands();
+
+      if (queueItems.length === 0) {
+        process.stdout.write(
+          `\r  Waiting for queue items... (${new Date().toLocaleTimeString()})`
+        );
+        await sleep(QUEUE_POLL_INTERVAL_MS);
+        continue;
+      }
+
+      process.stdout.write("\r" + " ".repeat(70) + "\r");
+
+      const brands = queueItems.map((q) => q.brandName);
+      const queueIds = new Map(queueItems.map((q) => [q.brandName, q.id]));
+
+      log.info(`Found ${queueItems.length} pending brand(s): ${brands.join(", ")}`);
+      await runBrandList(brands, force, queueIds);
+
+      log.info("\nBatch complete. Watching for more queue items...\n");
+      await sleep(COOLDOWN_BETWEEN_BRANDS_MS);
     }
-
-    const brands = queueItems.map((q) => q.brandName);
-    const queueIds = new Map(queueItems.map((q) => [q.brandName, q.id]));
-
-    log.info(`Found ${queueItems.length} pending brand(s) in queue`);
-    await runBrandList(brands, force, queueIds);
-    await disconnect();
-    return;
   }
 
   // ─── STANDARD MODE: CLI args or auto brands ───
