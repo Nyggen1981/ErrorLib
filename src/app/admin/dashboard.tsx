@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 type MiningLogEntry = {
   id: string;
@@ -1259,7 +1259,7 @@ function GoogleIndexingPanel() {
 
   const [error, setError] = useState<string | null>(null);
   const [batchLog, setBatchLog] = useState<string[]>([]);
-  const [cancelRef] = useState<{ current: boolean }>({ current: false });
+  const cancelRef = useRef(false);
 
   async function handlePush(auto = false) {
     setPushing(true);
