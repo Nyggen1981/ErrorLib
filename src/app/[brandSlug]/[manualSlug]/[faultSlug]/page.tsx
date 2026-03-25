@@ -218,9 +218,12 @@ export default async function FaultCodePage({ params }: Props) {
 
           <HasFullSteps>
             <section className="rounded-lg border border-technical-700 bg-technical-800 p-5 sm:p-6">
-              <h2 className="mb-4 text-lg font-bold text-technical-50">
+              <h2 className="mb-1 text-lg font-bold text-technical-50">
                 {t("completeGuide", locale)}
               </h2>
+              <p className="mb-4 text-xs text-technical-400">
+                {t("stepsInPriorityFix", locale)}
+              </p>
               <TranslatedFullSteps />
             </section>
           </HasFullSteps>
