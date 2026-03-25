@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 
@@ -69,6 +70,7 @@ export function SearchBar({
   variant?: "hero" | "header";
   locale: Locale;
 }) {
+  const pathname = usePathname();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults>(null);
   const [open, setOpen] = useState(false);
@@ -77,6 +79,8 @@ export function SearchBar({
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const isHero = variant === "hero";
+
+  if (variant === "header" && pathname === "/") return null;
 
   const logSearch = useCallback((q: string, resultCount: number) => {
     fetch("/api/search/log", {
