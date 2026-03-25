@@ -328,8 +328,12 @@ function UserRequestsPanel({
     setBusy(null);
   }
 
-  const pending = requests.filter((r) => r.status === "pending");
-  const handled = requests.filter((r) => r.status !== "pending");
+  const pending = requests.filter(
+    (r) => r.status === "pending" || r.status === "planned"
+  );
+  const handled = requests.filter(
+    (r) => r.status === "approved" || r.status === "rejected"
+  );
 
   const reqBadge = (status: string) => {
     const s: Record<string, string> = {
@@ -372,7 +376,14 @@ function UserRequestsPanel({
               {pending.map((r) => (
                 <tr key={r.id} className="text-technical-300">
                   <td className="py-3 pr-4 font-medium text-technical-200">
-                    {r.brand}
+                    <div className="flex items-center gap-2">
+                      {r.brand}
+                      {r.status === "planned" && (
+                        <span className="rounded-full bg-accent/20 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                          listed
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 pr-4 text-technical-400">
                     {r.model || "—"}
@@ -394,13 +405,19 @@ function UserRequestsPanel({
                       >
                         Approve & Mine
                       </button>
-                      <button
-                        onClick={() => handleAction(r.id, "plan")}
-                        disabled={busy === r.id}
-                        className="rounded px-2.5 py-1 text-xs font-medium text-accent transition hover:bg-accent/20 disabled:opacity-50"
-                      >
-                        Coming Soon
-                      </button>
+                      {r.status === "planned" ? (
+                        <span className="rounded bg-accent/10 px-2.5 py-1 text-xs text-accent/60">
+                          On site
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleAction(r.id, "plan")}
+                          disabled={busy === r.id}
+                          className="rounded px-2.5 py-1 text-xs font-medium text-accent transition hover:bg-accent/20 disabled:opacity-50"
+                        >
+                          Coming Soon
+                        </button>
+                      )}
                       <button
                         onClick={() => handleAction(r.id, "reject")}
                         disabled={busy === r.id}
