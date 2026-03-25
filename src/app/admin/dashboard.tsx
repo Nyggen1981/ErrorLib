@@ -1257,9 +1257,12 @@ function GoogleIndexingPanel() {
       .finally(() => setLoading(false));
   }, []);
 
+  const [error, setError] = useState<string | null>(null);
+
   async function handlePush() {
     setPushing(true);
     setResult(null);
+    setError(null);
     try {
       const res = await fetch("/api/admin/push-indexing", { method: "POST" });
       const data = await res.json();
@@ -1275,9 +1278,11 @@ function GoogleIndexingPanel() {
             : prev
         );
       } else {
-        setResult({ pushed: 0, failed: 0, remaining: stats?.remaining ?? 0 });
+        setError(data.error || "Request failed");
       }
-    } catch {}
+    } catch {
+      setError("Network error");
+    }
     setPushing(false);
   }
 
@@ -1338,7 +1343,13 @@ function GoogleIndexingPanel() {
         </div>
       ) : null}
 
-      {result && !pushing && (
+      {error && !pushing && (
+        <div className="mt-3 rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
+          {error}
+        </div>
+      )}
+
+      {result && !pushing && !error && (
         <div className="mt-3 rounded-lg border border-technical-600 bg-technical-900 p-3 text-sm">
           <div className="flex flex-wrap gap-4">
             <span className="text-success">
