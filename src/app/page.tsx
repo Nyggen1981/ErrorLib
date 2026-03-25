@@ -119,7 +119,8 @@ export default async function HomePage() {
                 Under Documentation
               </h2>
               <p className="mt-1 text-sm text-technical-400">
-                Planned for next update
+                Our technicians are currently indexing documentation for the
+                following manufacturers.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
