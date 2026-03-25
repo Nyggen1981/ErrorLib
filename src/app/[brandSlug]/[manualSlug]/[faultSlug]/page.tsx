@@ -2,6 +2,14 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { TranslatedContent } from "@/components/TranslatedContent";
+import {
+  TranslatedTitle,
+  TranslatedDescription,
+  TranslatedPrioritySteps,
+  TranslatedMoreSteps,
+  TranslatedFullSteps,
+  TranslatingBanner,
+} from "@/components/FaultCodeContent";
 import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
 import type { Metadata } from "next";
@@ -73,7 +81,12 @@ export default async function FaultCodePage({ params }: Props) {
   const cachedTranslation = locale !== "en" ? translations[locale] ?? null : null;
 
   return (
-    <>
+    <TranslatedContent
+      faultCodeId={fault.id}
+      locale={locale}
+      fallback={englishContent}
+      cached={cachedTranslation}
+    >
       <Breadcrumbs
         items={[
           { label: t("home", locale), href: "/" },
@@ -89,135 +102,82 @@ export default async function FaultCodePage({ params }: Props) {
         ]}
       />
 
-      <TranslatedContent
-        faultCodeId={fault.id}
-        locale={locale}
-        fallback={englishContent}
-        cached={cachedTranslation}
-      >
-        {(content, loading) => (
-          <>
-            {/* Loading indicator */}
-            {loading && (
-              <div className="mb-4 flex items-center gap-2 rounded-lg bg-accent/10 px-4 py-2.5 text-sm text-accent">
-                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                {t("translating", locale)}
-              </div>
-            )}
+      <TranslatingBanner label={t("translating", locale)} />
 
-            {/* Hero */}
-            <section className="mb-8 rounded-2xl border border-technical-200 bg-white p-6 sm:p-10">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
-                <div className="flex min-w-[5rem] shrink-0 items-center justify-center rounded-xl bg-technical-900 px-4 py-5 sm:min-w-[6rem] sm:py-6">
-                  <span
-                    className={`whitespace-nowrap font-mono font-bold text-white ${
-                      fault.code.length > 8
-                        ? "text-base sm:text-lg"
-                        : fault.code.length > 5
-                          ? "text-xl sm:text-2xl"
-                          : "text-2xl sm:text-3xl"
-                    }`}
-                  >
-                    {fault.code}
-                  </span>
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
-                    {content.title}
-                  </h1>
-                  <p className="mt-1 text-sm text-technical-400">
-                    {fault.manual.brand.name} &middot; {displayName}
-                  </p>
-                </div>
-              </div>
-            </section>
+      {/* Hero */}
+      <section className="mb-8 rounded-2xl border border-technical-200 bg-white p-6 sm:p-10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
+          <div className="flex min-w-[5rem] shrink-0 items-center justify-center rounded-xl bg-technical-900 px-4 py-5 sm:min-w-[6rem] sm:py-6">
+            <span
+              className={`whitespace-nowrap font-mono font-bold text-white ${
+                fault.code.length > 8
+                  ? "text-base sm:text-lg"
+                  : fault.code.length > 5
+                    ? "text-xl sm:text-2xl"
+                    : "text-2xl sm:text-3xl"
+              }`}
+            >
+              {fault.code}
+            </span>
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
+              <TranslatedTitle />
+            </h1>
+            <p className="mt-1 text-sm text-technical-400">
+              {fault.manual.brand.name} &middot; {displayName}
+            </p>
+          </div>
+        </div>
+      </section>
 
-            <div className="grid gap-8 lg:grid-cols-3">
-              {/* Quick Action Card */}
-              <aside className="lg:col-span-1">
-                <div className="sticky top-8 rounded-2xl border-2 border-accent bg-white p-6">
-                  <div className="mb-4 flex items-center gap-2">
-                    <svg
-                      className="h-5 w-5 text-accent"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"
-                      />
-                    </svg>
-                    <h2 className="text-lg font-bold text-accent">
-                      {t("priorityFix", locale)}
-                    </h2>
-                  </div>
-                  <p className="mb-4 text-sm text-technical-500">
-                    {t("priorityFixSubtitle", locale)}
-                  </p>
-                  <ol className="space-y-3">
-                    {content.fixSteps.slice(0, 3).map((step, i) => (
-                      <li key={i} className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">
-                          {i + 1}
-                        </span>
-                        <span className="text-sm leading-relaxed text-technical-700">
-                          {step}
-                        </span>
-                      </li>
-                    ))}
-                  </ol>
-                  {content.fixSteps.length > 3 && (
-                    <p className="mt-4 text-xs text-technical-400">
-                      + {content.fixSteps.length - 3} {t("moreStepsBelow", locale)}
-                    </p>
-                  )}
-                </div>
-              </aside>
-
-              {/* Main Content */}
-              <div className="lg:col-span-2 space-y-8">
-                {/* Description */}
-                <section className="rounded-2xl border border-technical-200 bg-white p-6 sm:p-8">
-                  <h2 className="mb-4 text-xl font-bold">
-                    {t("whatDoesMean", locale)} {fault.code} {t("mean", locale)}
-                  </h2>
-                  <p className="leading-relaxed text-technical-600">
-                    {content.description}
-                  </p>
-                </section>
-
-                {/* Full Troubleshooting Steps */}
-                <section className="rounded-2xl border border-technical-200 bg-white p-6 sm:p-8">
-                  <h2 className="mb-6 text-xl font-bold">
-                    {t("completeGuide", locale)}
-                  </h2>
-                  <ol className="space-y-4">
-                    {content.fixSteps.map((step, i) => (
-                      <li
-                        key={i}
-                        className="flex items-start gap-4 rounded-lg border border-technical-100 bg-technical-50 p-4"
-                      >
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-technical-900 font-mono text-sm font-bold text-white">
-                          {i + 1}
-                        </span>
-                        <p className="pt-1 leading-relaxed text-technical-700">
-                          {step}
-                        </p>
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              </div>
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* Quick Action Card */}
+        <aside className="lg:col-span-1">
+          <div className="sticky top-8 rounded-2xl border-2 border-accent bg-white p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <svg
+                className="h-5 w-5 text-accent"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"
+                />
+              </svg>
+              <h2 className="text-lg font-bold text-accent">
+                {t("priorityFix", locale)}
+              </h2>
             </div>
-          </>
-        )}
-      </TranslatedContent>
+            <p className="mb-4 text-sm text-technical-500">
+              {t("priorityFixSubtitle", locale)}
+            </p>
+            <TranslatedPrioritySteps />
+            <TranslatedMoreSteps label={t("moreStepsBelow", locale)} />
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-8">
+          <section className="rounded-2xl border border-technical-200 bg-white p-6 sm:p-8">
+            <h2 className="mb-4 text-xl font-bold">
+              {t("whatDoesMean", locale)} {fault.code} {t("mean", locale)}
+            </h2>
+            <TranslatedDescription />
+          </section>
+
+          <section className="rounded-2xl border border-technical-200 bg-white p-6 sm:p-8">
+            <h2 className="mb-6 text-xl font-bold">
+              {t("completeGuide", locale)}
+            </h2>
+            <TranslatedFullSteps />
+          </section>
+        </div>
+      </div>
 
       {/* Source link */}
       {(fault.sourceUrl || fault.manual.pdfUrl) && (
@@ -245,6 +205,6 @@ export default async function FaultCodePage({ params }: Props) {
           </a>
         </div>
       )}
-    </>
+    </TranslatedContent>
   );
 }
