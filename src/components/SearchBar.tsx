@@ -216,8 +216,11 @@ export function SearchBar({
 
               {/* Fault code matches grouped by brand */}
               {results.faultGroups.map((group) => (
-                <div key={group.brandSlug} className="px-3 py-2">
-                  <div className="mb-1 flex items-center gap-2" style={{ paddingLeft: 88 }}>
+                <div key={group.brandSlug} className="py-2">
+                  <div
+                    className="mb-1 flex items-center gap-2"
+                    style={{ paddingLeft: 76, textAlign: "left" }}
+                  >
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-technical-500">
                       {group.brand}
                     </p>
@@ -230,21 +233,48 @@ export function SearchBar({
                       key={fc.href}
                       href={fc.href}
                       onClick={() => { logSearch(query, group.codes.length); setOpen(false); }}
-                      className="rounded-lg px-3 py-2 transition hover:bg-technical-800"
-                      style={{ display: "grid", gridTemplateColumns: "60px 1fr", columnGap: 16, alignItems: "center" }}
+                      className="rounded-lg py-2 transition hover:bg-technical-800"
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "64px 1fr",
+                        columnGap: 12,
+                        alignItems: "center",
+                        justifyItems: "start",
+                        textAlign: "left",
+                        width: "100%",
+                        paddingLeft: 0,
+                        paddingRight: 12,
+                      }}
                     >
                       <span
                         className="overflow-hidden rounded bg-technical-700 py-0.5 font-mono text-xs font-bold text-accent"
-                        style={{ display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", width: 60, minWidth: 60, maxWidth: 60 }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          boxSizing: "border-box",
+                          width: 64,
+                          minWidth: 64,
+                          maxWidth: 64,
+                        }}
                       >
                         <span className="truncate px-1">{fc.code}</span>
                       </span>
-                      <div className="overflow-hidden">
-                        <p className="truncate text-sm text-technical-300">
+                      <div
+                        className="overflow-hidden"
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                          textAlign: "left",
+                          width: "100%",
+                        }}
+                      >
+                        <p className="w-full truncate text-sm text-technical-300">
                           {fc.title}
                         </p>
                         {fc.manual && (
-                          <p className="truncate text-xs text-technical-500">
+                          <p className="w-full truncate text-xs text-technical-500">
                             {fc.manual}
                           </p>
                         )}
@@ -256,7 +286,7 @@ export function SearchBar({
                       href={`/${group.brandSlug}`}
                       onClick={() => { logSearch(query, group.codes.length); setOpen(false); }}
                       className="block py-1.5 text-xs text-accent transition hover:text-accent/80"
-                      style={{ paddingLeft: 88 }}
+                      style={{ paddingLeft: 76, textAlign: "left" }}
                     >
                       + {group.codes.length - 6} more from {group.brand} →
                     </a>
