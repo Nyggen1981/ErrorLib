@@ -484,7 +484,7 @@ export function AdminDashboard({
   const totalBrandCodes = brandStats.reduce((s, b) => s + b.faultCodes, 0);
 
   return (
-    <div className="-mx-4 -mt-8 min-h-screen bg-technical-900 px-4 py-8 sm:-mx-6 sm:px-6">
+    <div className="min-h-screen bg-technical-900 px-4 py-8 sm:px-6">
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>

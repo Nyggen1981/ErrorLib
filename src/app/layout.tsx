@@ -26,34 +26,44 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className="bg-technical-50 text-technical-900 antialiased">
-        <header className="border-b border-technical-200 bg-white">
+        <header className="bg-technical-900">
           <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-            <a href="/" className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-technical-900">
+            <a href="/" className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent">
                 <span className="font-mono text-sm font-bold text-white">
                   EL
                 </span>
               </div>
-              <span className="text-lg font-semibold tracking-tight">
+              <span className="text-lg font-semibold tracking-tight text-white">
                 ErrorLib
               </span>
             </a>
-            <div className="flex items-center gap-6 text-sm text-technical-500">
+            <div className="flex items-center gap-6 text-sm">
               <a
                 href="/"
-                className="transition-colors hover:text-technical-900"
+                className="text-technical-300 transition-colors hover:text-white"
               >
                 Brands
               </a>
             </div>
           </nav>
         </header>
-        <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-          {children}
-        </main>
-        <footer className="border-t border-technical-200 bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-6 text-center text-sm text-technical-400 sm:px-6">
+        <main>{children}</main>
+        <footer className="bg-technical-900 text-technical-500">
+          <div className="mx-auto max-w-6xl px-4 py-5 text-center text-xs sm:px-6">
             ErrorLib &mdash; Industrial Fault Code Reference
           </div>
         </footer>

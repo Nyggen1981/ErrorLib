@@ -50,7 +50,7 @@ export function RequestForm() {
 
   return (
     <section className="mt-16">
-      <div className="rounded-2xl border border-technical-200 bg-gradient-to-br from-white to-technical-50 p-8">
+      <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-8">
         <div className="mx-auto max-w-xl text-center">
           <h2 className="text-xl font-semibold text-technical-800">
             Can&apos;t find your equipment?
