@@ -230,9 +230,9 @@ export function SearchBar({
                       key={fc.href}
                       href={fc.href}
                       onClick={() => { logSearch(query, group.codes.length); setOpen(false); }}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2 transition hover:bg-technical-800"
+                      className="flex items-start gap-3 rounded-lg px-3 py-2 transition hover:bg-technical-800"
                     >
-                      <span className="shrink-0 self-start rounded bg-technical-700 px-2 py-0.5 font-mono text-xs font-bold text-accent">
+                      <span className="w-12 shrink-0 rounded bg-technical-700 px-2 py-0.5 text-center font-mono text-xs font-bold text-accent">
                         {fc.code}
                       </span>
                       <div className="min-w-0">
