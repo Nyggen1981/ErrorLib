@@ -4,7 +4,7 @@ import { log } from "./lib/logger.js";
 import { searchManuals, extractManualName } from "./lib/search.js";
 import { downloadPdf, ensureTempDir } from "./lib/download.js";
 import { extractDiagnosticText } from "./lib/pdf-parser.js";
-import { extractAndSave, preflight } from "./lib/extract.js";
+import { extractAndSave, extractWithOcr, preflight } from "./lib/extract.js";
 import {
   upsertBrand,
   upsertManual,
@@ -388,15 +388,45 @@ async function mine(
     log.info(`  [SAVINGS] Skipped ${noRelevanceSkipped} manuals with no relevant pages`);
   }
 
-  const totalPages = pdfTexts.reduce((n, p) => n + p.pages.length, 0);
-  if (totalPages === 0) {
+  // Detect image-heavy PDFs: average < 100 chars per page
+  type OcrCandidate = { pdfPath: string; url: string; title: string };
+  const ocrCandidates: OcrCandidate[] = [];
+  const textPdfs: typeof pdfTexts = [];
+
+  for (const pdf of pdfTexts) {
+    const avgChars = pdf.pages.reduce((s, p) => s + p.text.length, 0) / Math.max(pdf.pages.length, 1);
+    if (avgChars < 100) {
+      log.info(`  [OCR] ${pdf.filename}: avg ${Math.round(avgChars)} chars/page — marking for OCR`);
+      ocrCandidates.push({ pdfPath: pdf.pdfPath, url: pdf.url, title: pdf.title });
+    } else {
+      textPdfs.push(pdf);
+    }
+  }
+
+  // Also add downloaded PDFs that had 0 relevant text pages (potential image-only PDFs)
+  for (const dl of downloaded) {
+    const fn = path.basename(dl.pdfPath);
+    const alreadyQueued = ocrCandidates.some((o) => path.basename(o.pdfPath) === fn);
+    const alreadyText = textPdfs.some((t) => t.filename === fn);
+    if (!alreadyQueued && !alreadyText) {
+      ocrCandidates.push(dl);
+    }
+  }
+
+  const totalPages = textPdfs.reduce((n, p) => n + p.pages.length, 0);
+  if (totalPages === 0 && ocrCandidates.length === 0) {
     log.error("No diagnostic pages found in any PDFs. Skipping this brand.");
     return 0;
   }
 
-  log.info(
-    `Extracted text from ${totalPages} diagnostic pages across ${pdfTexts.length} PDFs`
-  );
+  if (totalPages > 0) {
+    log.info(
+      `Extracted text from ${totalPages} diagnostic pages across ${textPdfs.length} PDFs`
+    );
+  }
+  if (ocrCandidates.length > 0) {
+    log.info(`${ocrCandidates.length} PDF(s) queued for OCR fallback`);
+  }
 
   // ─── PHASE 4: AI EXTRACTION ───
   log.step("\u{1F916}", "PHASE 4: Extracting fault codes with Gemini...");
@@ -404,7 +434,7 @@ async function mine(
   const brandRecord = await upsertBrand(brand);
   let grandTotal = 0;
 
-  for (const pdf of pdfTexts) {
+  for (const pdf of textPdfs) {
     const manualName = await extractManualName(pdf.title, pdf.url, brand);
     log.info(`Processing manual: ${manualName} (${pdf.pages.length} pages)`);
 
@@ -422,7 +452,18 @@ async function mine(
 
     const manualStart = Date.now();
     try {
-      const count = await extractAndSave(pdf.pages, manual.id, pdf.url);
+      let count = await extractAndSave(pdf.pages, manual.id, pdf.url);
+
+      // OCR fallback: if text extraction found nothing, try vision
+      if (count === 0) {
+        log.info(`  [OCR FALLBACK] Text extraction returned 0 codes, trying Gemini Vision...`);
+        try {
+          count = await extractWithOcr(pdf.pdfPath, manual.id, pdf.url);
+        } catch (ocrErr) {
+          log.warn(`  [OCR FALLBACK] Failed: ${ocrErr instanceof Error ? ocrErr.message.substring(0, 150) : ocrErr}`);
+        }
+      }
+
       grandTotal += count;
       const durMs = Date.now() - manualStart;
 
@@ -459,9 +500,65 @@ async function mine(
     }
   }
 
+  // ─── PHASE 5: OCR for image-heavy PDFs ───
+  if (ocrCandidates.length > 0) {
+    log.step("\u{1F4F7}", `PHASE 5: OCR extraction for ${ocrCandidates.length} image-based PDF(s)...`);
+
+    for (const dl of ocrCandidates) {
+      const fn = path.basename(dl.pdfPath);
+      const manualName = await extractManualName(dl.title, dl.url, brand);
+      log.info(`[OCR] Processing: ${manualName}`);
+
+      const manual = await upsertManual(brandRecord.id, manualName, dl.url);
+      await createMiningLog({
+        brand,
+        manual: manualName,
+        codesFound: 0,
+        pagesUsed: 0,
+        durationMs: 0,
+        status: "started",
+        message: "OCR vision-based extraction...",
+      });
+
+      const ocrStart = Date.now();
+      try {
+        const count = await extractWithOcr(dl.pdfPath, manual.id, dl.url);
+        grandTotal += count;
+        const durMs = Date.now() - ocrStart;
+
+        markCompleted(fn, dl.url, brand, count);
+        await createMiningLog({
+          brand,
+          manual: manualName,
+          codesFound: count,
+          pagesUsed: 0,
+          durationMs: durMs,
+          status: count > 0 ? "success" : "empty",
+          message: count > 0 ? `OCR extracted ${count} codes` : "OCR found no codes",
+        });
+
+        log.success(`  -> ${count} fault codes via OCR from ${manualName} (${(durMs / 1000).toFixed(1)}s)`);
+      } catch (err) {
+        const durMs = Date.now() - ocrStart;
+        markFailed(fn, dl.url, brand);
+        const errMsg = err instanceof Error ? err.message.substring(0, 200) : "Unknown error";
+        await createMiningLog({
+          brand,
+          manual: manualName,
+          codesFound: 0,
+          pagesUsed: 0,
+          durationMs: durMs,
+          status: "failed",
+          message: `OCR failed: ${errMsg}`,
+        });
+        log.error(`  [OCR] Failed: ${errMsg}`);
+      }
+    }
+  }
+
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   log.success(
-    `${brand} complete: ${grandTotal} codes from ${pdfTexts.length} manuals in ${elapsed}s`
+    `${brand} complete: ${grandTotal} codes from ${textPdfs.length + ocrCandidates.length} manuals in ${elapsed}s`
   );
 
   if (grandTotal > 0) {
@@ -542,14 +639,18 @@ async function runBrandList(
   for (let i = 0; i < brands.length; i++) {
     const brand = brands[i];
     const queueId = queueIds?.get(brand);
-    const targets = queueTargets?.get(brand);
+    const rawTargets = queueTargets?.get(brand);
+    const isForceRetry = rawTargets?.includes("__FORCE_RETRY__") ?? false;
+    const targets = isForceRetry ? undefined : rawTargets;
     const isExpand = targets && targets.length > 0;
 
     if (brands.length > 1) {
       log.banner(`BRAND ${i + 1}/${brands.length}: ${brand.toUpperCase()}`);
     }
 
-    if (isExpand) {
+    if (isForceRetry) {
+      log.info(`[RETRY] Force re-mining "${brand}" (heavy mining mode)`);
+    } else if (isExpand) {
       log.info(`[EXPAND] Targeted mining for: ${targets.join(", ")}`);
     }
 
@@ -558,8 +659,8 @@ async function runBrandList(
       log.info(`Queue status -> processing`);
     }
 
-    // Skip completed brands unless --force or this is a targeted expand
-    if (!force && !isExpand && isBrandCompleted(brand)) {
+    // Skip completed brands unless --force, targeted expand, or force retry
+    if (!force && !isExpand && !isForceRetry && isBrandCompleted(brand)) {
       log.info(`[SAVINGS] Brand "${brand}" already completed. Use --force to re-mine.`);
       savings.skippedBrandCompleted++;
       results.push({ brand, codes: 0, status: "CACHED" });

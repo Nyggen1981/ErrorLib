@@ -124,6 +124,53 @@ function queueStatusBadge(status: string) {
   );
 }
 
+function RetryButton({ brand }: { brand: string }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<"ok" | "error" | null>(null);
+
+  async function handleRetry() {
+    setBusy(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/retry-mining", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brand }),
+      });
+      if (res.ok) {
+        setResult("ok");
+      } else {
+        const data = await res.json();
+        if (data.error?.includes("already in the queue")) {
+          setResult("ok");
+        } else {
+          setResult("error");
+        }
+      }
+    } catch {
+      setResult("error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (result === "ok") {
+    return (
+      <span className="text-xs text-success">Queued ✓</span>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleRetry}
+      disabled={busy}
+      className="rounded bg-warning/20 px-2 py-1 text-xs font-medium text-warning transition hover:bg-warning/30 disabled:opacity-50"
+    >
+      {busy ? "..." : "⛏️ Retry"}
+    </button>
+  );
+}
+
 function MiningQueuePanel({ initialQueue }: { initialQueue: QueueEntry[] }) {
   const [queue, setQueue] = useState<QueueEntry[]>(initialQueue);
   const [brandInput, setBrandInput] = useState("");
@@ -1313,7 +1360,8 @@ export function AdminDashboard({
                     <th className="pb-3 pr-4 font-medium text-right">
                       Duration
                     </th>
-                    <th className="pb-3 font-medium">When</th>
+                    <th className="pb-3 pr-4 font-medium">When</th>
+                    <th className="pb-3 font-medium"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-technical-700/50">
@@ -1345,8 +1393,15 @@ export function AdminDashboard({
                       <td className="py-3 pr-4 text-right tabular-nums text-technical-500">
                         {(entry.durationMs / 1000).toFixed(1)}s
                       </td>
-                      <td className="py-3 whitespace-nowrap text-technical-500">
+                      <td className="py-3 pr-4 whitespace-nowrap text-technical-500">
                         {timeAgo(entry.createdAt)}
+                      </td>
+                      <td className="py-3">
+                        {(entry.status === "empty" ||
+                          entry.status === "aborted" ||
+                          entry.status === "failed") && (
+                          <RetryButton brand={entry.brand} />
+                        )}
                       </td>
                     </tr>
                   ))}

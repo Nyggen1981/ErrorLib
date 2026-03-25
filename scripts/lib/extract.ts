@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { log } from "./logger.js";
 import { enqueueFaultCode, flushDbQueue, queueSize } from "./db.js";
@@ -164,25 +166,180 @@ function buildChunkText(
 }
 
 const MAX_CHARS_PER_REQUEST = 20_000;
+const MAX_PAGES_PER_CHUNK = 20;
 const MAX_CODES_PER_MANUAL = 60;
 const RATE_LIMIT_GAP_MS = 35_000;
+const OCR_MIN_TEXT_CHARS = 100;
+const OCR_MAX_PAGES = 30;
+
+async function renderPdfPageToImage(
+  pdfPath: string,
+  pageNum: number
+): Promise<Buffer | null> {
+  try {
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const data = new Uint8Array(fs.readFileSync(pdfPath));
+    const doc = await pdfjs.getDocument({ data, useSystemFonts: true }).promise;
+    const page = await doc.getPage(pageNum);
+
+    const viewport = page.getViewport({ scale: 2.0 });
+    const { createCanvas } = await import("canvas");
+    const canvas = createCanvas(viewport.width, viewport.height);
+    const ctx = canvas.getContext("2d");
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (page as any).render({
+      canvasContext: ctx,
+      viewport,
+    }).promise;
+
+    page.cleanup();
+    await doc.destroy();
+    return canvas.toBuffer("image/png");
+  } catch (err) {
+    log.warn(`  [OCR] Failed to render page ${pageNum}: ${err instanceof Error ? err.message : err}`);
+    return null;
+  }
+}
+
+async function callGeminiVision(
+  images: { data: string; mimeType: string }[],
+  maxRetries = 3
+): Promise<ExtractionResult> {
+  const genAI = getGemini();
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  const parts = [
+    { text: `${BATCH_PROMPT}\n\nThe following images are pages from an industrial equipment manual. Analyze them and extract all fault/error/alarm codes you can find.` },
+    ...images.map((img) => ({
+      inlineData: { data: img.data, mimeType: img.mimeType },
+    })),
+  ];
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await model.generateContent(parts);
+      const raw = result.response.text().trim();
+      const cleaned = raw
+        .replace(/^```json?\s*/i, "")
+        .replace(/```\s*$/i, "")
+        .trim();
+      return JSON.parse(cleaned) as ExtractionResult;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isRetryable =
+        msg.includes("429") || msg.includes("503") ||
+        msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED") ||
+        msg.includes("UNAVAILABLE") || msg.includes("overloaded");
+
+      if (isRetryable && attempt < maxRetries) {
+        const wait = 30 * (attempt + 1);
+        log.warn(`  [OCR] ${msg.substring(0, 80)} — retrying in ${wait}s (${attempt + 1}/${maxRetries})`);
+        await sleep(wait * 1000);
+        continue;
+      }
+      throw err;
+    }
+  }
+  return { codes: [] };
+}
+
+export async function extractWithOcr(
+  pdfPath: string,
+  manualId: string,
+  sourceUrl?: string
+): Promise<number> {
+  log.info(`[OCR] Starting vision-based extraction for ${path.basename(pdfPath)}`);
+
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const data = new Uint8Array(fs.readFileSync(pdfPath));
+  const doc = await pdfjs.getDocument({ data, useSystemFonts: true }).promise;
+  const totalPages = doc.numPages;
+  await doc.destroy();
+
+  const pagesToProcess = Math.min(totalPages, OCR_MAX_PAGES);
+  log.info(`[OCR] Rendering ${pagesToProcess} of ${totalPages} pages as images...`);
+
+  const imageChunks: { data: string; mimeType: string }[][] = [];
+  let currentBatch: { data: string; mimeType: string }[] = [];
+
+  for (let i = 1; i <= pagesToProcess; i++) {
+    const buf = await renderPdfPageToImage(pdfPath, i);
+    if (!buf) continue;
+
+    currentBatch.push({
+      data: buf.toString("base64"),
+      mimeType: "image/png",
+    });
+
+    if (currentBatch.length >= 5) {
+      imageChunks.push(currentBatch);
+      currentBatch = [];
+    }
+  }
+  if (currentBatch.length > 0) imageChunks.push(currentBatch);
+
+  if (imageChunks.length === 0) {
+    log.warn("[OCR] No pages could be rendered");
+    return 0;
+  }
+
+  log.info(`[OCR] Sending ${imageChunks.length} batch(es) to Gemini Vision...`);
+  let allCodes: ExtractedCode[] = [];
+
+  for (let c = 0; c < imageChunks.length; c++) {
+    if (c > 0) {
+      log.detail(`  [OCR] Rate-limit gap before batch ${c + 1}...`);
+      await sleep(RATE_LIMIT_GAP_MS);
+    }
+
+    try {
+      const result = await callGeminiVision(imageChunks[c]);
+      if (result.codes.length > 0) {
+        log.success(`  [OCR] Batch ${c + 1}: ${result.codes.length} codes found`);
+        allCodes.push(...result.codes);
+      } else {
+        log.detail(`  [OCR] Batch ${c + 1}: no codes found`);
+      }
+    } catch (err) {
+      log.warn(`  [OCR] Batch ${c + 1} failed: ${err instanceof Error ? err.message.substring(0, 150) : err}`);
+    }
+  }
+
+  const capped = filterAndCap(allCodes, MAX_CODES_PER_MANUAL);
+  for (const fc of capped) {
+    enqueueFaultCode({
+      manualId,
+      code: fc.code,
+      title: fc.title,
+      description: fc.description || `Fault ${fc.code}`,
+      fixSteps: (fc.fixSteps || ["Refer to manufacturer documentation."]).slice(0, 5),
+      sourceUrl,
+    });
+    log.detail(`    [OCR] ${fc.code} - ${fc.title}`);
+  }
+
+  const saved = await flushDbQueue();
+  if (saved > 0) log.success(`  [OCR] Pushed ${saved} codes to Neon`);
+  return saved;
+}
 
 export async function extractAndSave(
   pages: { pageNumber: number; text: string }[],
   manualId: string,
   sourceUrl?: string
 ): Promise<number> {
-  // Split pages into text chunks that fit the Gemini context window
   const chunks: { pageNumber: number; text: string }[][] = [];
   let currentChunk: { pageNumber: number; text: string }[] = [];
   let currentLen = 0;
 
   for (const page of pages) {
     const pageLen = page.text.length + 30;
-    if (
-      currentLen + pageLen > MAX_CHARS_PER_REQUEST &&
-      currentChunk.length > 0
-    ) {
+    const chunkFull =
+      (currentLen + pageLen > MAX_CHARS_PER_REQUEST || currentChunk.length >= MAX_PAGES_PER_CHUNK) &&
+      currentChunk.length > 0;
+
+    if (chunkFull) {
       chunks.push(currentChunk);
       currentChunk = [];
       currentLen = 0;
