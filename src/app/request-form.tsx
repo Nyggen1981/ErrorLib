@@ -53,11 +53,11 @@ export function RequestForm() {
       <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-8">
         <div className="mx-auto max-w-xl text-center">
           <h2 className="text-xl font-semibold text-technical-800">
-            Can&apos;t find your equipment?
+            Missing a manual?
           </h2>
           <p className="mt-2 text-sm text-technical-500">
-            Request a brand or model and we&apos;ll add it to our mining queue.
-            Popular requests are prioritized.
+            Submit a request and our team will prioritize adding it to our
+            technical library.
           </p>
         </div>
 
@@ -69,7 +69,7 @@ export function RequestForm() {
                 : "Thank you! We'll look into it."}
             </p>
             <p className="mt-1 text-sm text-technical-500">
-              Popular requests are added first.
+              Popular requests are prioritized by our team.
             </p>
             <button
               onClick={() => setStatus("idle")}

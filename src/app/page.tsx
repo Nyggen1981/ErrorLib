@@ -91,11 +91,8 @@ export default async function HomePage() {
         {activeBrands.length === 0 ? (
           <div className="rounded-xl border border-dashed border-technical-300 bg-white p-12 text-center">
             <p className="text-technical-400">
-              No brands yet. Run the mining rig to populate the database.
-            </p>
-            <code className="mt-2 inline-block rounded bg-technical-100 px-3 py-1.5 font-mono text-sm text-technical-600">
-              npm run mine -- --brand=&quot;ABB&quot;
-            </code>
+            No brands indexed yet. Documentation is currently being reviewed.
+          </p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -132,10 +129,10 @@ export default async function HomePage() {
           <section className="mt-14">
             <div className="mb-5">
               <h2 className="text-lg font-semibold text-technical-700">
-                Coming Soon
+                Pending Expansion
               </h2>
               <p className="mt-1 text-sm text-technical-400">
-                These brands are next in the mining queue.
+                Our technicians are currently indexing documentation for the following manufacturers.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

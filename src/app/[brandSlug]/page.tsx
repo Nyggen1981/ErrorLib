@@ -201,7 +201,7 @@ export default async function BrandPage({ params }: Props) {
             No fault codes have been extracted for {brand.name} yet.
           </p>
           <p className="mt-1 text-sm text-technical-400">
-            This brand is in the mining queue.
+            Documentation is currently being indexed.
           </p>
         </div>
       )}
