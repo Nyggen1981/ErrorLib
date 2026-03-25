@@ -120,7 +120,7 @@ export default async function HomePage() {
               </h2>
               <p className="mt-1 text-sm text-technical-400">
                 Our technicians are currently indexing documentation for the
-                following manufacturers.
+                following manufacturers / models.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
