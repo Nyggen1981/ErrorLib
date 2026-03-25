@@ -217,7 +217,7 @@ export function SearchBar({
               {/* Fault code matches grouped by brand */}
               {results.faultGroups.map((group) => (
                 <div key={group.brandSlug} className="px-3 py-2">
-                  <div className="mb-1 flex items-center gap-2 pl-[4.25rem]">
+                  <div className="mb-1 flex items-center gap-2" style={{ paddingLeft: 88 }}>
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-technical-500">
                       {group.brand}
                     </p>
@@ -232,10 +232,13 @@ export function SearchBar({
                       onClick={() => { logSearch(query, group.codes.length); setOpen(false); }}
                       className="flex items-center rounded-lg px-3 py-2 transition hover:bg-technical-800"
                     >
-                      <span className="inline-flex w-12 shrink-0 items-center justify-center rounded bg-technical-700 py-0.5 font-mono text-xs font-bold text-accent">
-                        {fc.code}
+                      <span
+                        className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded bg-technical-700 py-0.5 font-mono text-xs font-bold text-accent"
+                        style={{ width: 60, minWidth: 60, maxWidth: 60 }}
+                      >
+                        <span className="truncate px-1">{fc.code}</span>
                       </span>
-                      <div className="ml-4 min-w-0">
+                      <div className="min-w-0" style={{ marginLeft: 16 }}>
                         <p className="truncate text-sm text-technical-300">
                           {fc.title}
                         </p>
@@ -251,7 +254,8 @@ export function SearchBar({
                     <a
                       href={`/${group.brandSlug}`}
                       onClick={() => { logSearch(query, group.codes.length); setOpen(false); }}
-                      className="block py-1.5 pl-[4.25rem] text-xs text-accent transition hover:text-accent/80"
+                      className="block py-1.5 text-xs text-accent transition hover:text-accent/80"
+                      style={{ paddingLeft: 88 }}
                     >
                       + {group.codes.length - 6} more from {group.brand} →
                     </a>
