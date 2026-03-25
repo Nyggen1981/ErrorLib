@@ -41,19 +41,11 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      let emailSent = false;
-      try {
-        await sendAdminAlert(cleanBrand, cleanModel, cleanEmail);
-        emailSent = true;
-      } catch (emailErr) {
-        console.error("[EMAIL] Admin alert failed:", emailErr);
-      }
+      sendAdminAlert(cleanBrand, cleanModel, cleanEmail).catch(() => {});
 
       return NextResponse.json({
         action: "voted",
         voteCount: updated.voteCount,
-        emailSent,
-        hasKey: !!process.env.RESEND_API_KEY,
       });
     }
 
@@ -67,15 +59,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    let emailSent = false;
-    try {
-      await sendAdminAlert(cleanBrand, cleanModel, cleanEmail);
-      emailSent = true;
-    } catch (emailErr) {
-      console.error("[EMAIL] Admin alert failed:", emailErr);
-    }
+    sendAdminAlert(cleanBrand, cleanModel, cleanEmail).catch(() => {});
 
-    return NextResponse.json({ action: "created", emailSent, hasKey: !!process.env.RESEND_API_KEY }, { status: 201 });
+    return NextResponse.json({ action: "created" }, { status: 201 });
   } catch {
     return NextResponse.json(
       { error: "Something went wrong" },
