@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 
 const ADMIN_EMAIL = "kjetilnygard@hotmail.com";
-const FROM_ADDRESS = "ErrorLib <notifications@errorlib.net>";
+const FROM_ADDRESS = process.env.RESEND_FROM_ADDRESS || "ErrorLib <onboarding@resend.dev>";
 
 function getResend() {
   const key = process.env.RESEND_API_KEY;
