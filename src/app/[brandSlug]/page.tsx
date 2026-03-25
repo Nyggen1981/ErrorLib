@@ -153,7 +153,7 @@ function groupManuals(manuals: ManualWithCount[], brandName: string): SeriesGrou
     real.push(...generics);
   }
 
-  return real.sort((a, b) => b.totalCodes - a.totalCodes);
+  return real.sort((a, b) => a.series.localeCompare(b.series, undefined, { numeric: true }));
 }
 
 // ── Manual priority for deduplication (higher = preferred) ──
