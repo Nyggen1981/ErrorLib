@@ -65,10 +65,11 @@ model MiningLog {
 }
 
 model MiningQueue {
-  id        String   @id @default(cuid())
-  brandName String
-  status    String   @default("pending")
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  brandName     String
+  status        String   @default("pending")
+  targetManuals String[] @default([])
+  createdAt     DateTime @default(now())
 
   @@index([status])
   @@index([createdAt])

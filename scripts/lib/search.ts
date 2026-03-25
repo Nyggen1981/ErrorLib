@@ -9,7 +9,8 @@ export type SearchResult = {
 
 export async function searchManuals(
   brand: string,
-  maxResults = 10
+  maxResults = 10,
+  targetSeries?: string[]
 ): Promise<SearchResult[]> {
   const apiKey = process.env.SERPER_API_KEY;
   if (!apiKey) {
@@ -18,11 +19,21 @@ export async function searchManuals(
     );
   }
 
-  const queries = [
-    `${brand} fault code list PDF manual English filetype:pdf`,
-    `${brand} troubleshooting guide error codes PDF English filetype:pdf`,
-    `${brand} drive diagnostic manual PDF English filetype:pdf`,
-  ];
+  let queries: string[];
+
+  if (targetSeries && targetSeries.length > 0) {
+    queries = targetSeries.flatMap((series) => [
+      `${brand} ${series} fault code list PDF manual filetype:pdf`,
+      `${brand} ${series} troubleshooting error codes PDF filetype:pdf`,
+    ]);
+    log.info(`[EXPAND] Targeted search for ${targetSeries.length} series: ${targetSeries.join(", ")}`);
+  } else {
+    queries = [
+      `${brand} fault code list PDF manual English filetype:pdf`,
+      `${brand} troubleshooting guide error codes PDF English filetype:pdf`,
+      `${brand} drive diagnostic manual PDF English filetype:pdf`,
+    ];
+  }
 
   const allResults: SearchResult[] = [];
   const seenUrls = new Set<string>();

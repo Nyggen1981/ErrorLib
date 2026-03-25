@@ -86,6 +86,29 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const SITEMAP_URL = "https://errorlib.net/sitemap.xml";
+
+async function pingSitemap(): Promise<void> {
+  const urls = [
+    `https://www.google.com/ping?sitemap=${encodeURIComponent(SITEMAP_URL)}`,
+    `https://www.bing.com/ping?sitemap=${encodeURIComponent(SITEMAP_URL)}`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { method: "GET" });
+      const engine = url.includes("google") ? "Google" : "Bing";
+      if (res.ok) {
+        log.success(`[PING] ${engine} sitemap ping OK`);
+      } else {
+        log.warn(`[PING] ${engine} responded ${res.status}`);
+      }
+    } catch (err) {
+      log.warn(`[PING] Failed: ${err}`);
+    }
+  }
+}
+
 function parseBrandArg(): string | null {
   const args = process.argv.slice(2);
 
@@ -130,7 +153,7 @@ async function resetStaleQueueItems(): Promise<void> {
 }
 
 async function fetchQueueBrands(): Promise<
-  { id: string; brandName: string }[]
+  { id: string; brandName: string; targetManuals: string[] }[]
 > {
   const prisma = getPrisma();
   return prisma.miningQueue.findMany({
@@ -175,7 +198,8 @@ async function getBrandFaultCount(brand: string): Promise<number> {
 async function mine(
   brand: string,
   force: boolean,
-  savings: SavingsStats
+  savings: SavingsStats,
+  targetManuals?: string[]
 ): Promise<number> {
   const startTime = Date.now();
   log.banner(`MINING RIG - ${brand.toUpperCase()}`);
@@ -198,8 +222,15 @@ async function mine(
   const minedUrls = getMinedUrlsForBrand(brand);
 
   // ─── PHASE 1: SEARCH ───
-  log.step("\u{1F310}", "PHASE 1: Searching for English manuals...");
-  const results = await searchManuals(brand, 10);
+  const isExpand = targetManuals && targetManuals.length > 0;
+  log.step(
+    "\u{1F310}",
+    isExpand
+      ? `PHASE 1: Targeted search for ${targetManuals.length} product series...`
+      : "PHASE 1: Searching for English manuals..."
+  );
+  const maxPdfs = isExpand ? Math.max(MAX_PDFS, targetManuals.length * 2) : 10;
+  const results = await searchManuals(brand, maxPdfs, targetManuals);
   log.info(`Found ${results.length} PDF results from Google`);
 
   if (results.length === 0) {
@@ -219,9 +250,10 @@ async function mine(
   const downloaded: { pdfPath: string; url: string; title: string }[] = [];
   let dupSkipped = 0;
   let fileCounter = 0;
+  const downloadLimit = isExpand ? Math.max(MAX_PDFS, (targetManuals?.length ?? 0) * 2) : MAX_PDFS;
 
   for (const result of results) {
-    if (downloaded.length >= MAX_PDFS) break;
+    if (downloaded.length >= downloadLimit) break;
 
     fileCounter++;
     const filename = `${brand.toLowerCase().replace(/\s+/g, "-")}_${fileCounter}.pdf`;
@@ -443,11 +475,12 @@ async function mineWithRetry(
   brand: string,
   force: boolean,
   savings: SavingsStats,
-  maxRetries = 3
+  maxRetries = 3,
+  targetManuals?: string[]
 ): Promise<number> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await mine(brand, force, savings);
+      return await mine(brand, force, savings, targetManuals);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
 
@@ -480,7 +513,8 @@ async function mineWithRetry(
 async function runBrandList(
   brands: string[],
   force: boolean,
-  queueIds?: Map<string, string>
+  queueIds?: Map<string, string>,
+  queueTargets?: Map<string, string[]>
 ) {
   const globalStart = Date.now();
   let totalCodes = 0;
@@ -508,9 +542,15 @@ async function runBrandList(
   for (let i = 0; i < brands.length; i++) {
     const brand = brands[i];
     const queueId = queueIds?.get(brand);
+    const targets = queueTargets?.get(brand);
+    const isExpand = targets && targets.length > 0;
 
     if (brands.length > 1) {
       log.banner(`BRAND ${i + 1}/${brands.length}: ${brand.toUpperCase()}`);
+    }
+
+    if (isExpand) {
+      log.info(`[EXPAND] Targeted mining for: ${targets.join(", ")}`);
     }
 
     if (queueId) {
@@ -518,8 +558,8 @@ async function runBrandList(
       log.info(`Queue status -> processing`);
     }
 
-    // ─── INCREMENTAL: Skip completed brands unless --force ───
-    if (!force && isBrandCompleted(brand)) {
+    // Skip completed brands unless --force or this is a targeted expand
+    if (!force && !isExpand && isBrandCompleted(brand)) {
       log.info(`[SAVINGS] Brand "${brand}" already completed. Use --force to re-mine.`);
       savings.skippedBrandCompleted++;
       results.push({ brand, codes: 0, status: "CACHED" });
@@ -537,7 +577,7 @@ async function runBrandList(
     }
 
     try {
-      const count = await mineWithRetry(brand, force, savings);
+      const count = await mineWithRetry(brand, force, savings, 3, targets);
       totalCodes += count;
       results.push({
         brand,
@@ -550,6 +590,12 @@ async function runBrandList(
           await notifyUsersForBrand(brand);
         } catch (notifyErr) {
           log.warn(`[NOTIFY] Error: ${notifyErr}`);
+        }
+
+        try {
+          await pingSitemap();
+        } catch (pingErr) {
+          log.warn(`[PING] Sitemap ping error: ${pingErr}`);
         }
       }
 
@@ -673,9 +719,17 @@ async function main() {
 
       const brands = queueItems.map((q) => q.brandName);
       const queueIds = new Map(queueItems.map((q) => [q.brandName, q.id]));
+      const queueTargets = new Map(
+        queueItems
+          .filter((q) => q.targetManuals.length > 0)
+          .map((q) => [q.brandName, q.targetManuals])
+      );
 
       log.info(`Found ${queueItems.length} pending brand(s): ${brands.join(", ")}`);
-      await runBrandList(brands, force, queueIds);
+      if (queueTargets.size > 0) {
+        log.info(`  ${queueTargets.size} brand(s) have targeted expansion series`);
+      }
+      await runBrandList(brands, force, queueIds, queueTargets);
 
       log.info("\nBatch complete. Watching for more queue items...\n");
       await sleep(COOLDOWN_BETWEEN_BRANDS_MS);

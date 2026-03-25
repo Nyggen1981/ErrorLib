@@ -943,6 +943,250 @@ function TranslationPanel() {
   );
 }
 
+type Suggestion = {
+  series: string;
+  category: string;
+  reason: string;
+};
+
+function ExpandBrandPanel({
+  brandStats,
+}: {
+  brandStats: { name: string; slug: string; manuals: number; faultCodes: number }[];
+}) {
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [existingManuals, setExistingManuals] = useState<string[]>([]);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [queuing, setQueuing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  async function handleResearch() {
+    if (!selectedBrand) return;
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    setSuggestions([]);
+    setChecked(new Set());
+
+    try {
+      const res = await fetch(
+        `/api/admin/expand-brand?brand=${encodeURIComponent(selectedBrand)}`
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Research failed");
+        return;
+      }
+      setSuggestions(data.suggestions ?? []);
+      setExistingManuals(data.existing ?? []);
+    } catch {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggleCheck(series: string) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(series)) next.delete(series);
+      else next.add(series);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (checked.size === suggestions.length) {
+      setChecked(new Set());
+    } else {
+      setChecked(new Set(suggestions.map((s) => s.series)));
+    }
+  }
+
+  async function handleQueue() {
+    if (checked.size === 0) return;
+    setQueuing(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch("/api/admin/expand-brand", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brand: selectedBrand,
+          series: Array.from(checked),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Queue failed");
+        return;
+      }
+      setSuccess(
+        `Queued ${checked.size} series for "${selectedBrand}". Run the miner with --queue to start.`
+      );
+      setSuggestions([]);
+      setChecked(new Set());
+    } catch {
+      setError("Network error");
+    } finally {
+      setQueuing(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
+      <h2 className="mb-1 text-lg font-semibold text-white">
+        Expand Brand Coverage
+      </h2>
+      <p className="mb-4 text-sm text-technical-400">
+        Use AI to discover missing product series and automatically queue them
+        for mining.
+      </p>
+
+      <div className="mb-4 flex gap-2">
+        <select
+          value={selectedBrand}
+          onChange={(e) => {
+            setSelectedBrand(e.target.value);
+            setSuggestions([]);
+            setChecked(new Set());
+            setError(null);
+            setSuccess(null);
+          }}
+          className="flex-1 rounded-lg border border-technical-600 bg-technical-900 px-3 py-2 text-sm text-white outline-none transition focus:border-accent"
+        >
+          <option value="">Select a brand...</option>
+          {brandStats.map((b) => (
+            <option key={b.slug} value={b.name}>
+              {b.name} ({b.manuals} manuals, {b.faultCodes} codes)
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={handleResearch}
+          disabled={!selectedBrand || loading}
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent/80 disabled:opacity-50"
+        >
+          {loading ? (
+            <span className="flex items-center gap-2">
+              <svg
+                className="h-4 w-4 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              Researching...
+            </span>
+          ) : (
+            "🔍 AI Research"
+          )}
+        </button>
+      </div>
+
+      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
+      {success && <p className="mb-3 text-sm text-success">{success}</p>}
+
+      {existingManuals.length > 0 && suggestions.length > 0 && (
+        <div className="mb-4 rounded-lg border border-technical-700 bg-technical-900 p-3">
+          <p className="mb-1 text-xs font-medium text-technical-400">
+            Already documented ({existingManuals.length})
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {existingManuals.map((name) => (
+              <span
+                key={name}
+                className="rounded bg-success/10 px-2 py-0.5 text-xs text-success"
+              >
+                {name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {suggestions.length > 0 && (
+        <>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-sm font-medium text-technical-200">
+              AI Suggestions — missing product series
+            </p>
+            <button
+              onClick={toggleAll}
+              className="text-xs text-accent transition hover:text-accent/80"
+            >
+              {checked.size === suggestions.length
+                ? "Deselect all"
+                : "Select all"}
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {suggestions.map((s) => (
+              <label
+                key={s.series}
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 transition ${
+                  checked.has(s.series)
+                    ? "border-accent bg-accent/5"
+                    : "border-technical-700 bg-technical-900 hover:border-technical-600"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked.has(s.series)}
+                  onChange={() => toggleCheck(s.series)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-white">{s.series}</span>
+                    <span className="rounded bg-technical-700 px-1.5 py-0.5 text-xs text-technical-400">
+                      {s.category}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-technical-500">
+                    {s.reason}
+                  </p>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          <div className="mt-4 flex items-center justify-between border-t border-technical-700 pt-4">
+            <p className="text-sm text-technical-400">
+              {checked.size} of {suggestions.length} selected
+            </p>
+            <button
+              onClick={handleQueue}
+              disabled={checked.size === 0 || queuing}
+              className="rounded-lg bg-success px-4 py-2 text-sm font-medium text-white transition hover:bg-success/80 disabled:opacity-50"
+            >
+              {queuing ? "Queuing..." : `⛏️ Start Mining Selected (${checked.size})`}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function AdminDashboard({
   stats,
   brandStats,
@@ -1115,6 +1359,11 @@ export function AdminDashboard({
             </p>
           )}
         </div>
+      </div>
+
+      {/* Expand Brand */}
+      <div className="mb-8">
+        <ExpandBrandPanel brandStats={brandStats} />
       </div>
 
       {/* Search Logs */}
