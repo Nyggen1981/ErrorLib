@@ -1258,32 +1258,70 @@ function GoogleIndexingPanel() {
   }, []);
 
   const [error, setError] = useState<string | null>(null);
+  const [batchLog, setBatchLog] = useState<string[]>([]);
+  const [cancelRef] = useState<{ current: boolean }>({ current: false });
 
-  async function handlePush() {
+  async function handlePush(auto = false) {
     setPushing(true);
     setResult(null);
     setError(null);
-    try {
-      const res = await fetch("/api/admin/push-indexing", { method: "POST" });
-      const data = await res.json();
-      if (res.ok) {
-        setResult(data);
+    cancelRef.current = false;
+    if (auto) setBatchLog([]);
+
+    let totalPushed = 0;
+    let totalFailed = 0;
+    let remaining = stats?.remaining ?? 0;
+    let batch = 0;
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      batch++;
+      if (auto) {
+        setBatchLog((prev) => [...prev, `Batch ${batch}: pushing...`]);
+      }
+
+      try {
+        const res = await fetch("/api/admin/push-indexing", { method: "POST" });
+        const data = await res.json();
+
+        if (!res.ok) {
+          setError(data.error || "Request failed");
+          break;
+        }
+
+        totalPushed += data.pushed ?? 0;
+        totalFailed += data.failed ?? 0;
+        remaining = data.remaining ?? 0;
+
+        setResult({ pushed: totalPushed, failed: totalFailed, remaining });
         setStats((prev) =>
           prev
-            ? {
-                ...prev,
-                indexed: prev.indexed + (data.pushed ?? 0),
-                remaining: data.remaining ?? prev.remaining,
-              }
+            ? { ...prev, indexed: prev.total - remaining, remaining }
             : prev
         );
-      } else {
-        setError(data.error || "Request failed");
+
+        if (auto) {
+          setBatchLog((prev) => {
+            const updated = [...prev];
+            updated[updated.length - 1] = `Batch ${batch}: ${data.pushed} pushed, ${data.failed} failed`;
+            return updated;
+          });
+        }
+
+        if (!auto || data.done || remaining === 0 || cancelRef.current) break;
+
+        await new Promise((r) => setTimeout(r, 1000));
+      } catch {
+        setError("Network error");
+        break;
       }
-    } catch {
-      setError("Network error");
     }
+
     setPushing(false);
+  }
+
+  function handleCancel() {
+    cancelRef.current = true;
   }
 
   const pct =
@@ -1300,23 +1338,42 @@ function GoogleIndexingPanel() {
             Push new fault code URLs to Google Indexing API
           </p>
         </div>
-        <button
-          onClick={handlePush}
-          disabled={pushing || (stats?.remaining === 0)}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-technical-900 transition hover:bg-accent/80 disabled:opacity-50"
-        >
+        <div className="flex items-center gap-2">
           {pushing ? (
-            <span className="flex items-center gap-2">
+            <button
+              onClick={handleCancel}
+              className="rounded-lg border border-technical-600 px-3 py-2 text-sm text-technical-300 transition hover:border-technical-500 hover:text-white"
+            >
+              Stop
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => handlePush(false)}
+                disabled={stats?.remaining === 0}
+                className="rounded-lg border border-technical-600 px-3 py-2 text-sm text-technical-300 transition hover:border-technical-500 hover:text-white disabled:opacity-50"
+              >
+                Push 100
+              </button>
+              <button
+                onClick={() => handlePush(true)}
+                disabled={stats?.remaining === 0}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-technical-900 transition hover:bg-accent/80 disabled:opacity-50"
+              >
+                Push All
+              </button>
+            </>
+          )}
+          {pushing && (
+            <span className="flex items-center gap-2 text-sm text-accent">
               <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
               Pushing...
             </span>
-          ) : (
-            "Push New Codes to Google"
           )}
-        </button>
+        </div>
       </div>
 
       {loading ? (
@@ -1364,6 +1421,14 @@ function GoogleIndexingPanel() {
               Remaining: <strong>{result.remaining}</strong>
             </span>
           </div>
+        </div>
+      )}
+
+      {batchLog.length > 1 && (
+        <div className="mt-3 max-h-32 overflow-y-auto rounded-lg border border-technical-700 bg-technical-900 p-2 text-xs text-technical-400">
+          {batchLog.map((line, i) => (
+            <div key={i}>{line}</div>
+          ))}
         </div>
       )}
 
