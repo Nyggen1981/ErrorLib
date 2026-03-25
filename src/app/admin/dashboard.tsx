@@ -469,6 +469,210 @@ function UserRequestsPanel({
   );
 }
 
+type TransBrand = {
+  name: string;
+  slug: string;
+  total: number;
+  translations: Record<string, number>;
+};
+
+type TransTotals = { total: number; no: number; de: number; es: number };
+
+function TranslationPanel() {
+  const [brands, setBrands] = useState<TransBrand[]>([]);
+  const [totals, setTotals] = useState<TransTotals | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [translating, setTranslating] = useState<string | null>(null);
+  const [result, setResult] = useState<string | null>(null);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/translations");
+      if (res.ok) {
+        const data = await res.json();
+        setBrands(data.brands);
+        setTotals(data.totals);
+      }
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  async function handlePreTranslate(brandSlug: string, brandName: string, lang: string) {
+    setTranslating(`${brandSlug}-${lang}`);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/translations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandSlug, lang }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setResult(
+          `${brandName} [${lang.toUpperCase()}]: ${data.translated} translated, ${data.failed} failed`
+        );
+        fetchStats();
+      } else {
+        setResult("Translation request failed");
+      }
+    } catch {
+      setResult("Network error");
+    }
+    setTranslating(null);
+  }
+
+  const LANGS = ["no", "de", "es"] as const;
+  const LANG_LABELS: Record<string, string> = { no: "NO", de: "DE", es: "ES" };
+  const LANG_COLORS: Record<string, string> = {
+    no: "bg-blue-500",
+    de: "bg-amber-500",
+    es: "bg-emerald-500",
+  };
+
+  function pct(n: number, total: number) {
+    return total > 0 ? Math.round((n / total) * 100) : 0;
+  }
+
+  return (
+    <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
+      <h2 className="mb-4 text-lg font-semibold text-white">
+        Translation Management
+      </h2>
+
+      {loading ? (
+        <p className="text-sm text-technical-400 animate-pulse">
+          Loading translation stats...
+        </p>
+      ) : !totals || totals.total === 0 ? (
+        <p className="text-sm text-technical-500">
+          No fault codes to translate yet.
+        </p>
+      ) : (
+        <>
+          {/* Global stats */}
+          <div className="mb-6 grid gap-4 sm:grid-cols-3">
+            {LANGS.map((lang) => {
+              const done = totals[lang];
+              const p = pct(done, totals.total);
+              return (
+                <div
+                  key={lang}
+                  className="rounded-lg border border-technical-700 bg-technical-900 p-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-technical-300">
+                      {LANG_LABELS[lang]}
+                    </span>
+                    <span className="text-xs tabular-nums text-technical-500">
+                      {done}/{totals.total}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-technical-700">
+                    <div
+                      className={`h-full rounded-full transition-all ${LANG_COLORS[lang]}`}
+                      style={{ width: `${Math.max(p, 1)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-right text-xs font-semibold tabular-nums text-technical-400">
+                    {p}%
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {result && (
+            <div className="mb-4 rounded-lg bg-accent/10 px-4 py-2.5 text-sm text-accent">
+              {result}
+            </div>
+          )}
+
+          {/* Per-brand table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-technical-700 text-technical-400">
+                  <th className="pb-3 pr-4 font-medium">Brand</th>
+                  <th className="pb-3 pr-4 font-medium text-right">Codes</th>
+                  {LANGS.map((lang) => (
+                    <th
+                      key={lang}
+                      className="pb-3 pr-2 font-medium text-center"
+                    >
+                      {LANG_LABELS[lang]}
+                    </th>
+                  ))}
+                  <th className="pb-3 font-medium text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-technical-700/50">
+                {brands.map((b) => (
+                  <tr key={b.slug} className="text-technical-300">
+                    <td className="py-3 pr-4 font-medium text-technical-200">
+                      {b.name}
+                    </td>
+                    <td className="py-3 pr-4 text-right tabular-nums text-technical-500">
+                      {b.total}
+                    </td>
+                    {LANGS.map((lang) => {
+                      const done = b.translations[lang] ?? 0;
+                      const p = pct(done, b.total);
+                      const full = p === 100;
+                      return (
+                        <td key={lang} className="py-3 pr-2 text-center">
+                          <div className="mx-auto w-16">
+                            <div className="h-1.5 overflow-hidden rounded-full bg-technical-700">
+                              <div
+                                className={`h-full rounded-full ${full ? "bg-success" : LANG_COLORS[lang]}`}
+                                style={{ width: `${Math.max(p, 2)}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] tabular-nums text-technical-500">
+                              {p}%
+                            </span>
+                          </div>
+                        </td>
+                      );
+                    })}
+                    <td className="py-3 text-right">
+                      <select
+                        disabled={translating !== null}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handlePreTranslate(b.slug, b.name, e.target.value);
+                            e.target.value = "";
+                          }
+                        }}
+                        className="rounded border border-technical-600 bg-technical-900 px-2 py-1 text-xs text-technical-300 outline-none disabled:opacity-50"
+                        defaultValue=""
+                      >
+                        <option value="" disabled>
+                          {translating?.startsWith(b.slug)
+                            ? "Translating..."
+                            : "Translate"}
+                        </option>
+                        {LANGS.map((lang) => (
+                          <option key={lang} value={lang}>
+                            → {LANG_LABELS[lang]}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function AdminDashboard({
   stats,
   brandStats,
@@ -641,6 +845,11 @@ export function AdminDashboard({
             </p>
           )}
         </div>
+      </div>
+
+      {/* Translation Management */}
+      <div className="mb-8">
+        <TranslationPanel />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-5">
