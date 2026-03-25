@@ -54,7 +54,7 @@ export function RequestForm({ locale }: { locale: Locale }) {
   const showSuccess = status === "created" || status === "voted";
 
   return (
-    <section className="hero-grid bg-technical-800 px-4 py-14 sm:px-6">
+    <section id="request" className="hero-grid bg-technical-800 px-4 py-14 sm:px-6">
       <div className="mx-auto max-w-6xl">
         <div className="mx-auto max-w-xl text-center">
           <h2 className="text-xl font-semibold text-white">

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
+import { SearchBar } from "@/components/SearchBar";
 import { RequestForm } from "./request-form";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +64,9 @@ export default async function HomePage() {
           <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-technical-400">
             {t("heroSubtitle", locale)}
           </p>
+          <div className="mx-auto mt-8 max-w-2xl">
+            <SearchBar variant="hero" locale={locale} />
+          </div>
           {totalCodes > 0 && (
             <div className="mt-6 flex items-center justify-center gap-6 text-sm">
               <span className="rounded-full bg-white/10 px-4 py-1.5 font-medium tabular-nums text-white">

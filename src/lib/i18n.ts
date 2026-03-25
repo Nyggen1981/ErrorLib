@@ -146,6 +146,32 @@ const dict = {
   },
   home: { en: "Home", no: "Hjem", de: "Startseite", es: "Inicio" },
   includes: { en: "Includes", no: "Inkluderer", de: "Beinhaltet", es: "Incluye" },
+
+  // ─── Search ───
+  searchPlaceholder: {
+    en: "Search fault codes, brands...",
+    no: "Søk feilkoder, merker...",
+    de: "Fehlercodes, Marken suchen...",
+    es: "Buscar códigos, marcas...",
+  },
+  searchHeroPlaceholder: {
+    en: "Search by code, error name, or brand (e.g. E004, Overcurrent, ABB)",
+    no: "Søk etter kode, feilnavn eller merke (f.eks. E004, Overcurrent, ABB)",
+    de: "Suche nach Code, Fehlername oder Marke (z.B. E004, Overcurrent, ABB)",
+    es: "Buscar por código, nombre de error o marca (ej. E004, Overcurrent, ABB)",
+  },
+  noResults: {
+    en: "No results found",
+    no: "Ingen resultater funnet",
+    de: "Keine Ergebnisse gefunden",
+    es: "No se encontraron resultados",
+  },
+  noResultsCta: {
+    en: "Code not found? Request it here",
+    no: "Fant du ikke koden? Send en forespørsel",
+    de: "Code nicht gefunden? Hier anfragen",
+    es: "¿Código no encontrado? Solicítalo aquí",
+  },
 } as const;
 
 export type TranslationKey = keyof typeof dict;

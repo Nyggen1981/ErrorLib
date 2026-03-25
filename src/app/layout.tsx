@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { t } from "@/lib/i18n";
 import { getLocale, getActiveLanguages } from "@/lib/locale";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { SearchBar } from "@/components/SearchBar";
 import { HreflangTags } from "@/components/HreflangTags";
 import "./globals.css";
 
@@ -79,10 +80,13 @@ export default async function RootLayout({
                 ErrorLib
               </span>
             </a>
-            <div className="flex items-center gap-4 sm:gap-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="hidden w-56 sm:block lg:w-72">
+                <SearchBar variant="header" locale={locale} />
+              </div>
               <a
                 href="/"
-                className="text-sm text-technical-300 transition-colors hover:text-white"
+                className="hidden text-sm text-technical-300 transition-colors hover:text-white sm:block"
               >
                 {t("brands", locale)}
               </a>
