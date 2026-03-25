@@ -51,6 +51,13 @@ export async function GET() {
   return NextResponse.json({ brands: brandData, totals });
 }
 
+const BATCH_SIZE = 5;
+const DELAY_MS = 2000;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function POST(req: NextRequest) {
   const authed = await isAdminAuthenticated();
   if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -85,18 +92,27 @@ export async function POST(req: NextRequest) {
     return !t || typeof t !== "object" || !(lang in t);
   });
 
+  const batch = missing.slice(0, BATCH_SIZE);
   let translated = 0;
   let failed = 0;
+  const errors: string[] = [];
 
-  for (const code of missing) {
+  for (let i = 0; i < batch.length; i++) {
+    if (i > 0) await sleep(DELAY_MS);
     try {
-      const result = await getTranslatedFaultCode(code.id, lang as Locale);
+      const result = await getTranslatedFaultCode(batch[i].id, lang as Locale);
       if (result) translated++;
-      else failed++;
-    } catch {
+      else {
+        failed++;
+        errors.push(`${batch[i].id}: returned null`);
+      }
+    } catch (err) {
       failed++;
+      errors.push(`${batch[i].id}: ${err instanceof Error ? err.message : "unknown"}`);
     }
   }
+
+  const remaining = missing.length - batch.length;
 
   return NextResponse.json({
     brand: brand.name,
@@ -105,5 +121,8 @@ export async function POST(req: NextRequest) {
     alreadyDone: codes.length - missing.length,
     translated,
     failed,
+    remaining,
+    errors: errors.length > 0 ? errors : undefined,
+    done: remaining === 0 && batch.length === 0,
   });
 }

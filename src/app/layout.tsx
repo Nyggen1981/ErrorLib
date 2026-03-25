@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { t } from "@/lib/i18n";
-import { getLocale } from "@/lib/locale";
+import { getLocale, getActiveLanguages } from "@/lib/locale";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import "./globals.css";
 
@@ -28,6 +28,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const locale = await getLocale();
+  const activeLanguages = await getActiveLanguages();
 
   return (
     <html lang={locale}>
@@ -63,7 +64,7 @@ export default async function RootLayout({
               >
                 {t("brands", locale)}
               </a>
-              <LanguageSwitcher current={locale} />
+              <LanguageSwitcher current={locale} activeLanguages={activeLanguages} />
             </div>
           </nav>
         </header>

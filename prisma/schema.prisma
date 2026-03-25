@@ -74,6 +74,11 @@ model MiningQueue {
   @@index([createdAt])
 }
 
+model SiteSetting {
+  key   String @id
+  value String
+}
+
 model UserRequest {
   id        String   @id @default(cuid())
   brand     String

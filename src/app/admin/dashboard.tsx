@@ -469,6 +469,101 @@ function UserRequestsPanel({
   );
 }
 
+function LanguageSettingsPanel() {
+  const ALL_LANGS = [
+    { code: "en", label: "English", flag: "🇬🇧" },
+    { code: "no", label: "Norwegian", flag: "🇳🇴" },
+    { code: "de", label: "German", flag: "🇩🇪" },
+    { code: "es", label: "Spanish", flag: "🇪🇸" },
+  ] as const;
+
+  const [active, setActive] = useState<string[]>(["en"]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then((r) => r.json())
+      .then((d) => setActive(d.activeLanguages ?? ["en"]))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleToggle(code: string) {
+    if (code === "en") return;
+    const next = active.includes(code)
+      ? active.filter((c) => c !== code)
+      : [...active, code];
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activeLanguages: next }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setActive(data.activeLanguages);
+      }
+    } catch {}
+    setSaving(false);
+  }
+
+  return (
+    <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
+      <h2 className="mb-1 text-lg font-semibold text-white">Active Languages</h2>
+      <p className="mb-4 text-sm text-technical-500">
+        Toggle which languages are visible on the public site. English is always active.
+      </p>
+
+      {loading ? (
+        <p className="text-sm text-technical-400 animate-pulse">Loading...</p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {ALL_LANGS.map((lang) => {
+            const isActive = active.includes(lang.code);
+            const isEnglish = lang.code === "en";
+            return (
+              <button
+                key={lang.code}
+                onClick={() => handleToggle(lang.code)}
+                disabled={saving || isEnglish}
+                className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition ${
+                  isActive
+                    ? "border-accent bg-accent/10"
+                    : "border-technical-700 bg-technical-900 opacity-60"
+                } ${isEnglish ? "cursor-default" : "hover:border-accent/50"} disabled:pointer-events-none`}
+              >
+                <span className="text-xl">{lang.flag}</span>
+                <div>
+                  <p className={`text-sm font-medium ${isActive ? "text-white" : "text-technical-400"}`}>
+                    {lang.label}
+                  </p>
+                  <p className="text-xs text-technical-500">
+                    {isEnglish ? "Always active" : isActive ? "Active" : "Disabled"}
+                  </p>
+                </div>
+                <div className="ml-auto">
+                  <div
+                    className={`h-5 w-9 rounded-full transition ${isActive ? "bg-accent" : "bg-technical-700"} relative`}
+                  >
+                    <div
+                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+                        isActive ? "left-[1.125rem]" : "left-0.5"
+                      }`}
+                    />
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type TransBrand = {
   name: string;
   slug: string;
@@ -483,7 +578,13 @@ function TranslationPanel() {
   const [totals, setTotals] = useState<TransTotals | null>(null);
   const [loading, setLoading] = useState(true);
   const [translating, setTranslating] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{
+    translated: number;
+    failed: number;
+    remaining: number;
+  } | null>(null);
   const [result, setResult] = useState<string | null>(null);
+  const [cancelled, setCancelled] = useState(false);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -502,27 +603,66 @@ function TranslationPanel() {
   }, [fetchStats]);
 
   async function handlePreTranslate(brandSlug: string, brandName: string, lang: string) {
-    setTranslating(`${brandSlug}-${lang}`);
+    const key = `${brandSlug}-${lang}`;
+    setTranslating(key);
     setResult(null);
-    try {
-      const res = await fetch("/api/admin/translations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandSlug, lang }),
-      });
-      if (res.ok) {
+    setCancelled(false);
+    let totalTranslated = 0;
+    let totalFailed = 0;
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      try {
+        const res = await fetch("/api/admin/translations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ brandSlug, lang }),
+        });
+
+        if (!res.ok) {
+          setResult(`${brandName} [${lang.toUpperCase()}]: Request failed`);
+          break;
+        }
+
         const data = await res.json();
-        setResult(
-          `${brandName} [${lang.toUpperCase()}]: ${data.translated} translated, ${data.failed} failed`
-        );
+        totalTranslated += data.translated ?? 0;
+        totalFailed += data.failed ?? 0;
+
+        setProgress({
+          translated: totalTranslated,
+          failed: totalFailed,
+          remaining: data.remaining ?? 0,
+        });
+
         fetchStats();
-      } else {
-        setResult("Translation request failed");
+
+        if (data.done || data.remaining === 0) {
+          setResult(
+            `${brandName} [${lang.toUpperCase()}]: ${totalTranslated} translated, ${totalFailed} failed`
+          );
+          break;
+        }
+
+        if (cancelled) {
+          setResult(
+            `${brandName} [${lang.toUpperCase()}]: Stopped — ${totalTranslated} translated, ${totalFailed} failed, ${data.remaining} remaining`
+          );
+          break;
+        }
+      } catch {
+        setResult(
+          `${brandName} [${lang.toUpperCase()}]: Network error after ${totalTranslated} translated`
+        );
+        break;
       }
-    } catch {
-      setResult("Network error");
     }
+
     setTranslating(null);
+    setProgress(null);
+  }
+
+  function handleCancel() {
+    setCancelled(true);
   }
 
   const LANGS = ["no", "de", "es"] as const;
@@ -585,7 +725,29 @@ function TranslationPanel() {
             })}
           </div>
 
-          {result && (
+          {progress && translating && (
+            <div className="mb-4 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3">
+              <div className="flex items-center justify-between text-sm text-accent">
+                <div className="flex items-center gap-2">
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span>
+                    Translating... {progress.translated} done, {progress.failed} failed, {progress.remaining} remaining
+                  </span>
+                </div>
+                <button
+                  onClick={handleCancel}
+                  className="rounded bg-technical-700 px-2 py-1 text-xs text-technical-300 hover:bg-technical-600 hover:text-white"
+                >
+                  Stop
+                </button>
+              </div>
+            </div>
+          )}
+
+          {result && !translating && (
             <div className="mb-4 rounded-lg bg-accent/10 px-4 py-2.5 text-sm text-accent">
               {result}
             </div>
@@ -847,8 +1009,9 @@ export function AdminDashboard({
         </div>
       </div>
 
-      {/* Translation Management */}
-      <div className="mb-8">
+      {/* Language Settings + Translation Management */}
+      <div className="mb-8 grid gap-8 lg:grid-cols-2">
+        <LanguageSettingsPanel />
         <TranslationPanel />
       </div>
 

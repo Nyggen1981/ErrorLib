@@ -16,6 +16,13 @@ type TranslationResult = {
 
 type TranslationsMap = Record<string, TranslationResult>;
 
+export class TranslateError extends Error {
+  constructor(public reason: string, public detail?: string) {
+    super(reason);
+    this.name = "TranslateError";
+  }
+}
+
 export async function getTranslatedFaultCode(
   faultCodeId: string,
   targetLang: Locale
@@ -33,22 +40,21 @@ export async function getTranslatedFaultCode(
     },
   });
 
-  if (!fault) return null;
+  if (!fault) throw new TranslateError("not_found", "Fault code not found in DB");
 
   const existing = (fault.translations as TranslationsMap) ?? {};
   if (existing[targetLang]) return existing[targetLang];
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) throw new TranslateError("no_api_key", "GEMINI_API_KEY is not set");
 
   const langName = LANG_NAMES[targetLang];
-  if (!langName) return null;
+  if (!langName) throw new TranslateError("invalid_lang", `Unknown language: ${targetLang}`);
 
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const prompt = `Translate the following industrial fault code information from English to ${langName}.
+  const prompt = `Translate the following industrial fault code information from English to ${langName}.
 Keep all technical terms, model numbers, and fault codes unchanged.
 Return ONLY valid JSON with this exact structure:
 {"title": "...", "description": "...", "fixSteps": ["step1", "step2", ...]}
@@ -59,27 +65,23 @@ Description: ${fault.description}
 Fix Steps:
 ${fault.fixSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new TranslateError("parse_error", "No JSON in Gemini response");
 
-    const parsed = JSON.parse(jsonMatch[0]) as TranslationResult;
+  const parsed = JSON.parse(jsonMatch[0]) as TranslationResult;
 
-    if (!parsed.title || !parsed.description || !Array.isArray(parsed.fixSteps)) {
-      return null;
-    }
-
-    const updated: TranslationsMap = { ...existing, [targetLang]: parsed };
-    await prisma.faultCode.update({
-      where: { id: faultCodeId },
-      data: { translations: updated },
-    });
-
-    return parsed;
-  } catch (err) {
-    console.error(`[TRANSLATE] Failed for ${faultCodeId} -> ${targetLang}:`, err);
-    return null;
+  if (!parsed.title || !parsed.description || !Array.isArray(parsed.fixSteps)) {
+    throw new TranslateError("invalid_json", "Gemini returned incomplete fields");
   }
+
+  const updated: TranslationsMap = { ...existing, [targetLang]: parsed };
+  await prisma.faultCode.update({
+    where: { id: faultCodeId },
+    data: { translations: updated },
+  });
+
+  return parsed;
 }
