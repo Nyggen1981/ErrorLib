@@ -1,0 +1,164 @@
+import { cookies } from "next/headers";
+
+export type Locale = "en" | "no" | "de" | "es";
+
+export const LOCALES: { code: Locale; label: string }[] = [
+  { code: "en", label: "EN" },
+  { code: "no", label: "NO" },
+  { code: "de", label: "DE" },
+  { code: "es", label: "ES" },
+];
+
+export async function getLocale(): Promise<Locale> {
+  const jar = await cookies();
+  const val = jar.get("lang")?.value;
+  if (val && ["en", "no", "de", "es"].includes(val)) return val as Locale;
+  return "en";
+}
+
+const dict = {
+  // ─── Layout / Header / Footer ───
+  brands: { en: "Brands", no: "Merker", de: "Marken", es: "Marcas" },
+  footerTitle: {
+    en: "ErrorLib — Industrial Fault Code Library",
+    no: "ErrorLib — Industrielt feilkodebibliotek",
+    de: "ErrorLib — Industrielle Fehlercodes Bibliothek",
+    es: "ErrorLib — Biblioteca de códigos de falla industriales",
+  },
+  disclaimer: {
+    en: "Disclaimer: ErrorLib is an independent technical reference tool. While we aim for accuracy, always verify with the manufacturer\u2019s official service manuals before performing maintenance on industrial equipment. ErrorLib is not affiliated with the brands listed.",
+    no: "Ansvarsfraskrivelse: ErrorLib er et uavhengig teknisk referanseverktøy. Vi tilstreber nøyaktighet, men kontroller alltid med produsentens offisielle servicemanualer før vedlikehold på industrielt utstyr. ErrorLib er ikke tilknyttet merkene som er oppført.",
+    de: "Haftungsausschluss: ErrorLib ist ein unabhängiges technisches Referenztool. Obwohl wir Genauigkeit anstreben, überprüfen Sie immer die offiziellen Servicehandbücher des Herstellers, bevor Sie Wartungsarbeiten an Industrieanlagen durchführen. ErrorLib ist nicht mit den aufgeführten Marken verbunden.",
+    es: "Descargo de responsabilidad: ErrorLib es una herramienta de referencia técnica independiente. Aunque buscamos la precisión, verifique siempre con los manuales de servicio oficiales del fabricante antes de realizar mantenimiento en equipos industriales. ErrorLib no está afiliado con las marcas listadas.",
+  },
+
+  // ─── Homepage ───
+  heroTitle: {
+    en: "Industrial Fault Code Library",
+    no: "Industrielt feilkodebibliotek",
+    de: "Industrielle Fehlercodes Bibliothek",
+    es: "Biblioteca de códigos de falla industriales",
+  },
+  heroSubtitle: {
+    en: "Find troubleshooting guides for industrial drives, PLCs, and controllers. Select a brand to get started.",
+    no: "Finn feilsøkingsguider for industrielle frekvensomformere, PLSer og kontrollere. Velg et merke for å komme i gang.",
+    de: "Finden Sie Fehlerbehebungsanleitungen für Industrieantriebe, SPSen und Steuerungen. Wählen Sie eine Marke, um zu beginnen.",
+    es: "Encuentre guías de solución de problemas para variadores industriales, PLCs y controladores. Seleccione una marca para comenzar.",
+  },
+  faultCodes: { en: "fault codes", no: "feilkoder", de: "Fehlercodes", es: "códigos de falla" },
+  noBrandsYet: {
+    en: "No brands indexed yet. Documentation is currently being reviewed.",
+    no: "Ingen merker indeksert ennå. Dokumentasjon blir gjennomgått.",
+    de: "Noch keine Marken indexiert. Die Dokumentation wird derzeit überprüft.",
+    es: "Aún no se han indexado marcas. La documentación está siendo revisada.",
+  },
+  underDocumentation: {
+    en: "Under Documentation",
+    no: "Under dokumentasjon",
+    de: "In Dokumentation",
+    es: "En documentación",
+  },
+  underDocSubtitle: {
+    en: "Our technicians are currently indexing documentation for the following manufacturers / models.",
+    no: "Våre teknikere indekserer for tiden dokumentasjon for følgende produsenter / modeller.",
+    de: "Unsere Techniker indexieren derzeit die Dokumentation für die folgenden Hersteller / Modelle.",
+    es: "Nuestros técnicos están indexando actualmente la documentación de los siguientes fabricantes / modelos.",
+  },
+  requests: { en: "requests", no: "forespørsler", de: "Anfragen", es: "solicitudes" },
+  manual: { en: "manual", no: "manual", de: "Handbuch", es: "manual" },
+  manuals: { en: "manuals", no: "manualer", de: "Handbücher", es: "manuales" },
+  codes: { en: "codes", no: "koder", de: "Codes", es: "códigos" },
+
+  // ─── Request Form ───
+  missingManual: {
+    en: "Missing a manual?",
+    no: "Mangler du en manual?",
+    de: "Fehlt ein Handbuch?",
+    es: "¿Falta un manual?",
+  },
+  requestSubtitle: {
+    en: "Submit a request and our team will prioritize adding it to our technical library.",
+    no: "Send inn en forespørsel, og teamet vårt vil prioritere å legge den til i vårt tekniske bibliotek.",
+    de: "Senden Sie eine Anfrage und unser Team wird das Hinzufügen zu unserer technischen Bibliothek priorisieren.",
+    es: "Envíe una solicitud y nuestro equipo priorizará agregarla a nuestra biblioteca técnica.",
+  },
+  brandPlaceholder: { en: "Brand (e.g. Mitsubishi)", no: "Merke (f.eks. Mitsubishi)", de: "Marke (z.B. Mitsubishi)", es: "Marca (ej. Mitsubishi)" },
+  modelPlaceholder: { en: "Model (optional)", no: "Modell (valgfritt)", de: "Modell (optional)", es: "Modelo (opcional)" },
+  emailPlaceholder: {
+    en: "Your email (optional \u2014 get notified when it's ready)",
+    no: "Din e-post (valgfritt \u2014 bli varslet når den er klar)",
+    de: "Ihre E-Mail (optional \u2014 Benachrichtigung erhalten)",
+    es: "Su email (opcional \u2014 reciba notificación cuando esté listo)",
+  },
+  requestBtn: { en: "Request", no: "Send", de: "Anfragen", es: "Solicitar" },
+  sending: { en: "Sending...", no: "Sender...", de: "Senden...", es: "Enviando..." },
+  thankVoted: { en: "Thanks! This request now has", no: "Takk! Denne forespørselen har nå", de: "Danke! Diese Anfrage hat jetzt", es: "¡Gracias! Esta solicitud ahora tiene" },
+  votes: { en: "votes", no: "stemmer", de: "Stimmen", es: "votos" },
+  thankCreated: { en: "Thank you! We'll look into it.", no: "Takk! Vi skal se på det.", de: "Danke! Wir werden es prüfen.", es: "¡Gracias! Lo revisaremos." },
+  popularRequests: {
+    en: "Popular requests are prioritized by our team.",
+    no: "Populære forespørsler blir prioritert av teamet vårt.",
+    de: "Beliebte Anfragen werden von unserem Team priorisiert.",
+    es: "Las solicitudes populares son priorizadas por nuestro equipo.",
+  },
+  submitAnother: { en: "Submit another request", no: "Send en ny forespørsel", de: "Weitere Anfrage senden", es: "Enviar otra solicitud" },
+  somethingWrong: { en: "Something went wrong. Please try again.", no: "Noe gikk galt. Prøv igjen.", de: "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.", es: "Algo salió mal. Por favor, inténtelo de nuevo." },
+
+  // ─── Fault code detail page ───
+  priorityFix: { en: "Priority Fix", no: "Prioritert fiks", de: "Prioritäts-Fix", es: "Solución prioritaria" },
+  priorityFixSubtitle: {
+    en: "Start with these steps to resolve the issue quickly:",
+    no: "Start med disse trinnene for å løse problemet raskt:",
+    de: "Beginnen Sie mit diesen Schritten, um das Problem schnell zu beheben:",
+    es: "Comience con estos pasos para resolver el problema rápidamente:",
+  },
+  moreStepsBelow: { en: "more steps below", no: "flere trinn nedenfor", de: "weitere Schritte unten", es: "más pasos abajo" },
+  whatDoesMean: { en: "What does", no: "Hva betyr", de: "Was bedeutet", es: "¿Qué significa" },
+  mean: { en: "mean?", no: "?", de: "?", es: "?" },
+  completeGuide: {
+    en: "Complete Troubleshooting Guide",
+    no: "Komplett feilsøkingsguide",
+    de: "Vollständige Fehlerbehebungsanleitung",
+    es: "Guía completa de solución de problemas",
+  },
+  sourceManual: { en: "Source:", no: "Kilde:", de: "Quelle:", es: "Fuente:" },
+  translating: { en: "Translating...", no: "Oversetter...", de: "Übersetzen...", es: "Traduciendo..." },
+
+  // ─── Brand page ───
+  modelFamilies: { en: "model families", no: "modellfamilier", de: "Modellfamilien", es: "familias de modelos" },
+  modelFamily: { en: "model family", no: "modellfamilie", de: "Modellfamilie", es: "familia de modelos" },
+  noFaultCodesYet: {
+    en: "No fault codes available yet. Check back soon.",
+    no: "Ingen feilkoder tilgjengelig ennå. Kom tilbake snart.",
+    de: "Noch keine Fehlercodes verfügbar. Schauen Sie bald wieder vorbei.",
+    es: "Aún no hay códigos de falla disponibles. Vuelva pronto.",
+  },
+  noFaultCodesExtracted: {
+    en: "No fault codes have been extracted for",
+    no: "Ingen feilkoder har blitt hentet ut for",
+    de: "Keine Fehlercodes wurden extrahiert für",
+    es: "No se han extraído códigos de falla para",
+  },
+  docBeingIndexed: {
+    en: "Documentation is currently being indexed.",
+    no: "Dokumentasjon blir for tiden indeksert.",
+    de: "Die Dokumentation wird derzeit indexiert.",
+    es: "La documentación se está indexando actualmente.",
+  },
+  faultCode: { en: "fault code", no: "feilkode", de: "Fehlercode", es: "código de falla" },
+  documented: { en: "documented", no: "dokumentert", de: "dokumentiert", es: "documentados" },
+  noFaultCodesManual: {
+    en: "No fault codes extracted yet for this manual.",
+    no: "Ingen feilkoder hentet ut ennå for denne manualen.",
+    de: "Noch keine Fehlercodes für dieses Handbuch extrahiert.",
+    es: "Aún no se han extraído códigos de falla para este manual.",
+  },
+  home: { en: "Home", no: "Hjem", de: "Startseite", es: "Inicio" },
+  includes: { en: "Includes", no: "Inkluderer", de: "Beinhaltet", es: "Incluye" },
+} as const;
+
+export type TranslationKey = keyof typeof dict;
+
+export function t(key: TranslationKey, locale: Locale): string {
+  return dict[key][locale] ?? dict[key].en;
+}

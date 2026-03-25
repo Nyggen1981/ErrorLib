@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FaultCodeCard } from "@/components/FaultCodeCard";
+import { getLocale, t } from "@/lib/i18n";
 import type { Metadata } from "next";
 
 type Props = { params: Promise<{ brandSlug: string; manualSlug: string }> };
@@ -27,6 +28,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ManualPage({ params }: Props) {
   const { brandSlug, manualSlug } = await params;
+  const locale = await getLocale();
+
   const manual = await prisma.manual.findUnique({
     where: { slug: manualSlug },
     include: {
@@ -43,7 +46,7 @@ export default async function ManualPage({ params }: Props) {
     <>
       <Breadcrumbs
         items={[
-          { label: "Home", href: "/" },
+          { label: t("home", locale), href: "/" },
           { label: manual.brand.name, href: `/${manual.brand.slug}` },
           { label: displayName },
         ]}
@@ -54,15 +57,16 @@ export default async function ManualPage({ params }: Props) {
           {manual.brand.name} {displayName}
         </h1>
         <p className="mt-3 text-lg text-technical-500">
-          {manual.faultCodes.length} fault{" "}
-          {manual.faultCodes.length === 1 ? "code" : "codes"} documented
+          {manual.faultCodes.length}{" "}
+          {manual.faultCodes.length === 1 ? t("faultCode", locale) : t("faultCodes", locale)}{" "}
+          {t("documented", locale)}
         </p>
       </div>
 
       {manual.faultCodes.length === 0 ? (
         <div className="rounded-xl border border-dashed border-technical-300 bg-white p-12 text-center">
           <p className="text-technical-400">
-            No fault codes extracted yet for this manual.
+            {t("noFaultCodesManual", locale)}
           </p>
         </div>
       ) : (

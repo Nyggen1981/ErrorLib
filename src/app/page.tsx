@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getLocale, t } from "@/lib/i18n";
 import { RequestForm } from "./request-form";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,8 @@ const BRAND_COLORS: Record<string, string> = {
 };
 
 export default async function HomePage() {
+  const locale = await getLocale();
+
   const [brands, plannedRequests] = await Promise.all([
     prisma.brand.findMany({
       include: {
@@ -54,19 +57,18 @@ export default async function HomePage() {
       <section className="hero-grid bg-technical-900 px-4 py-16 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-6xl text-center">
           <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
-            Industrial Fault Code Library
+            {t("heroTitle", locale)}
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-technical-400">
-            Find troubleshooting guides for industrial drives, PLCs, and
-            controllers. Select a brand to get started.
+            {t("heroSubtitle", locale)}
           </p>
           {totalCodes > 0 && (
             <div className="mt-6 flex items-center justify-center gap-6 text-sm">
               <span className="rounded-full bg-white/10 px-4 py-1.5 font-medium tabular-nums text-white">
-                {totalCodes.toLocaleString()} fault codes
+                {totalCodes.toLocaleString()} {t("faultCodes", locale)}
               </span>
               <span className="rounded-full bg-white/10 px-4 py-1.5 font-medium tabular-nums text-white">
-                {activeBrands.length} brands
+                {activeBrands.length} {t("brands", locale).toLowerCase()}
               </span>
             </div>
           )}
@@ -78,7 +80,7 @@ export default async function HomePage() {
         {activeBrands.length === 0 ? (
           <div className="rounded-xl border border-dashed border-technical-300 bg-white p-12 text-center">
             <p className="text-technical-400">
-              No brands indexed yet. Documentation is currently being reviewed.
+              {t("noBrandsYet", locale)}
             </p>
           </div>
         ) : (
@@ -99,10 +101,12 @@ export default async function HomePage() {
                   <div className="mt-3 flex items-center gap-2">
                     <span className="rounded-full bg-technical-100 px-2.5 py-0.5 text-xs font-medium text-technical-600">
                       {brand.populatedManuals}{" "}
-                      {brand.populatedManuals === 1 ? "manual" : "manuals"}
+                      {brand.populatedManuals === 1
+                        ? t("manual", locale)
+                        : t("manuals", locale)}
                     </span>
                     <span className="rounded-full bg-technical-100 px-2.5 py-0.5 text-xs font-medium text-technical-700">
-                      {brand.totalFaultCodes} codes
+                      {brand.totalFaultCodes} {t("codes", locale)}
                     </span>
                   </div>
                 </a>
@@ -111,16 +115,15 @@ export default async function HomePage() {
           </div>
         )}
 
-        {/* Under Documentation — driven by "planned" user requests */}
+        {/* Under Documentation */}
         {comingSoon.length > 0 && (
           <section className="mt-14">
             <div className="mb-5">
               <h2 className="text-lg font-semibold text-technical-700">
-                Under Documentation
+                {t("underDocumentation", locale)}
               </h2>
               <p className="mt-1 text-sm text-technical-400">
-                Our technicians are currently indexing documentation for the
-                following manufacturers / models.
+                {t("underDocSubtitle", locale)}
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -134,7 +137,7 @@ export default async function HomePage() {
                   </p>
                   {req.voteCount >= 20 && (
                     <p className="mt-1 text-xs text-technical-400">
-                      {req.voteCount} requests
+                      {req.voteCount} {t("requests", locale)}
                     </p>
                   )}
                 </div>
@@ -142,10 +145,9 @@ export default async function HomePage() {
             </div>
           </section>
         )}
-
       </div>
 
-      <RequestForm />
+      <RequestForm locale={locale} />
     </>
   );
 }

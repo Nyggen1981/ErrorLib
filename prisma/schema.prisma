@@ -32,17 +32,18 @@ model Manual {
 }
 
 model FaultCode {
-  id          String   @id @default(cuid())
-  code        String
-  slug        String   @unique
-  title       String
-  description String
-  fixSteps    String[]
-  sourceUrl   String?
-  manual      Manual   @relation(fields: [manualId], references: [id], onDelete: Cascade)
-  manualId    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  code         String
+  slug         String   @unique
+  title        String
+  description  String
+  fixSteps     String[]
+  sourceUrl    String?
+  translations Json     @default("{}")
+  manual       Manual   @relation(fields: [manualId], references: [id], onDelete: Cascade)
+  manualId     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([manualId])
   @@index([code])

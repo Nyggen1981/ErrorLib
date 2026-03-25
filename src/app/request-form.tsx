@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { t } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 
-export function RequestForm() {
+export function RequestForm({ locale }: { locale: Locale }) {
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [email, setEmail] = useState("");
@@ -56,11 +58,10 @@ export function RequestForm() {
       <div className="mx-auto max-w-6xl">
         <div className="mx-auto max-w-xl text-center">
           <h2 className="text-xl font-semibold text-white">
-            Missing a manual?
+            {t("missingManual", locale)}
           </h2>
           <p className="mt-2 text-sm text-technical-400">
-            Submit a request and our team will prioritize adding it to our
-            technical library.
+            {t("requestSubtitle", locale)}
           </p>
         </div>
 
@@ -68,17 +69,17 @@ export function RequestForm() {
           <div className="mx-auto mt-6 max-w-md rounded-xl border border-success/20 bg-success/10 p-5 text-center">
             <p className="font-medium text-success">
               {status === "voted"
-                ? `Thanks! This request now has ${voteCount} votes.`
-                : "Thank you! We'll look into it."}
+                ? `${t("thankVoted", locale)} ${voteCount} ${t("votes", locale)}.`
+                : t("thankCreated", locale)}
             </p>
             <p className="mt-1 text-sm text-technical-400">
-              Popular requests are prioritized by our team.
+              {t("popularRequests", locale)}
             </p>
             <button
               onClick={() => setStatus("idle")}
               className="mt-3 text-sm font-medium text-accent transition hover:text-accent/80"
             >
-              Submit another request
+              {t("submitAnother", locale)}
             </button>
           </div>
         ) : (
@@ -91,7 +92,7 @@ export function RequestForm() {
                 type="text"
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
-                placeholder="Brand (e.g. Mitsubishi)"
+                placeholder={t("brandPlaceholder", locale)}
                 required
                 className="flex-1 rounded-lg border border-technical-600 bg-technical-900 px-4 py-2.5 text-sm text-white placeholder-technical-500 outline-none transition focus:border-accent focus:ring-1 focus:ring-accent/30"
               />
@@ -99,7 +100,7 @@ export function RequestForm() {
                 type="text"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder="Model (optional)"
+                placeholder={t("modelPlaceholder", locale)}
                 className="flex-1 rounded-lg border border-technical-600 bg-technical-900 px-4 py-2.5 text-sm text-white placeholder-technical-500 outline-none transition focus:border-accent focus:ring-1 focus:ring-accent/30"
               />
             </div>
@@ -108,7 +109,7 @@ export function RequestForm() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Your email (optional — get notified when it's ready)"
+                placeholder={t("emailPlaceholder", locale)}
                 className="flex-1 rounded-lg border border-technical-600 bg-technical-900 px-4 py-2.5 text-sm text-white placeholder-technical-500 outline-none transition focus:border-accent focus:ring-1 focus:ring-accent/30"
               />
               <button
@@ -116,7 +117,7 @@ export function RequestForm() {
                 disabled={status === "loading" || !brand.trim()}
                 className="rounded-lg bg-accent px-6 py-2.5 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-50"
               >
-                {status === "loading" ? "Sending..." : "Request"}
+                {status === "loading" ? t("sending", locale) : t("requestBtn", locale)}
               </button>
             </div>
           </form>
@@ -124,7 +125,7 @@ export function RequestForm() {
 
         {status === "error" && (
           <p className="mt-3 text-center text-sm text-danger">
-            Something went wrong. Please try again.
+            {t("somethingWrong", locale)}
           </p>
         )}
       </div>

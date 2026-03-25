@@ -21,6 +21,7 @@
   "type": "module",
   "license": "ISC",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@neondatabase/serverless": "^1.0.2",
     "@prisma/adapter-neon": "^7.5.0",
     "@prisma/client": "^7.5.0",
@@ -30,7 +31,6 @@
     "resend": "^6.9.4"
   },
   "devDependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",

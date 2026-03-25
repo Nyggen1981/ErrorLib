@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { getLocale, t } from "@/lib/i18n";
 import type { Metadata } from "next";
 
 type Props = { params: Promise<{ brandSlug: string }> };
@@ -118,6 +119,8 @@ function groupManuals(
 
 export default async function BrandPage({ params }: Props) {
   const { brandSlug } = await params;
+  const locale = await getLocale();
+
   const brand = await prisma.brand.findUnique({
     where: { slug: brandSlug },
     include: {
@@ -136,7 +139,7 @@ export default async function BrandPage({ params }: Props) {
   return (
     <>
       <Breadcrumbs
-        items={[{ label: "Home", href: "/" }, { label: brand.name }]}
+        items={[{ label: t("home", locale), href: "/" }, { label: brand.name }]}
       />
 
       <div className="mb-10">
@@ -145,8 +148,8 @@ export default async function BrandPage({ params }: Props) {
         </h1>
         <p className="mt-3 text-lg text-technical-500">
           {groups.length > 0
-            ? `${groups.length} model ${groups.length === 1 ? "family" : "families"} \u00B7 ${totalCodes} fault codes`
-            : "No fault codes available yet. Check back soon."}
+            ? `${groups.length} ${groups.length === 1 ? t("modelFamily", locale) : t("modelFamilies", locale)} \u00B7 ${totalCodes} ${t("faultCodes", locale)}`
+            : t("noFaultCodesYet", locale)}
         </p>
       </div>
 
@@ -171,7 +174,7 @@ export default async function BrandPage({ params }: Props) {
                   </h2>
                   {manualCount > 1 && (
                     <span className="shrink-0 rounded-full bg-technical-100 px-2.5 py-0.5 text-xs font-medium text-technical-600">
-                      {manualCount} manuals
+                      {manualCount} {t("manuals", locale)}
                     </span>
                   )}
                 </div>
@@ -179,13 +182,13 @@ export default async function BrandPage({ params }: Props) {
                 <p className="mt-2 text-lg font-semibold tabular-nums text-technical-700">
                   {group.totalCodes}{" "}
                   <span className="text-sm font-normal text-technical-400">
-                    fault {group.totalCodes === 1 ? "code" : "codes"}
+                    {group.totalCodes === 1 ? t("faultCode", locale) : t("faultCodes", locale)}
                   </span>
                 </p>
 
                 {hasVariants && (
                   <p className="mt-2 text-xs text-technical-400">
-                    Includes {group.variants.slice(0, 4).join(", ")}
+                    {t("includes", locale)} {group.variants.slice(0, 4).join(", ")}
                     {group.variants.length > 4
                       ? ` +${group.variants.length - 4} more`
                       : ""}
@@ -198,10 +201,10 @@ export default async function BrandPage({ params }: Props) {
       ) : (
         <div className="rounded-xl border border-dashed border-technical-300 bg-white p-12 text-center">
           <p className="text-technical-500">
-            No fault codes have been extracted for {brand.name} yet.
+            {t("noFaultCodesExtracted", locale)} {brand.name}.
           </p>
           <p className="mt-1 text-sm text-technical-400">
-            Documentation is currently being indexed.
+            {t("docBeingIndexed", locale)}
           </p>
         </div>
       )}

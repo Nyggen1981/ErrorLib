@@ -73,6 +73,9 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
 
+  // Reset cached translations when English content changes
+  data.translations = {};
+
   const updated = await prisma.faultCode.update({
     where: { id },
     data,

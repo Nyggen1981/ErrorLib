@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { getLocale, t } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,13 +21,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
+
   return (
-    <html lang="en">
+    <html lang={locale}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -51,26 +55,23 @@ export default function RootLayout({
                 ErrorLib
               </span>
             </a>
-            <div className="flex items-center gap-6 text-sm">
+            <div className="flex items-center gap-4 sm:gap-6">
               <a
                 href="/"
-                className="text-technical-300 transition-colors hover:text-white"
+                className="text-sm text-technical-300 transition-colors hover:text-white"
               >
-                Brands
+                {t("brands", locale)}
               </a>
+              <LanguageSwitcher current={locale} />
             </div>
           </nav>
         </header>
         <main>{children}</main>
         <footer className="bg-technical-900 text-technical-500">
           <div className="mx-auto max-w-6xl px-4 py-5 text-center text-xs sm:px-6">
-            <p>ErrorLib &mdash; Industrial Fault Code Library</p>
+            <p>{t("footerTitle", locale)}</p>
             <p className="mx-auto mt-3 max-w-3xl text-[11px] leading-relaxed text-technical-600">
-              Disclaimer: ErrorLib is an independent technical reference tool.
-              While we aim for accuracy, always verify with the
-              manufacturer&apos;s official service manuals before performing
-              maintenance on industrial equipment. ErrorLib is not affiliated
-              with the brands listed.
+              {t("disclaimer", locale)}
             </p>
           </div>
         </footer>
