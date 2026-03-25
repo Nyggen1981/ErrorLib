@@ -53,10 +53,11 @@ export default async function ManualPage({ params }: Props) {
 
   const displayName = stripBrand(manual.name, manual.brand.name);
 
+  type FaultCodeRow = (typeof manual.faultCodes)[number];
   type TranslationEntry = { title?: string; description?: string };
   type TranslationsMap = Record<string, TranslationEntry>;
 
-  function localized(fc: (typeof manual.faultCodes)[number]) {
+  function localized(fc: FaultCodeRow) {
     if (locale === "en") return { title: fc.title, description: fc.description };
     const map = (fc.translations as TranslationsMap) ?? {};
     const tr = map[locale];
