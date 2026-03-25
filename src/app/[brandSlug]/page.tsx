@@ -142,7 +142,7 @@ export default async function BrandPage({ params }: Props) {
   const totalCodes = groups.reduce((s, g) => s + g.totalCodes, 0);
 
   return (
-    <>
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <Breadcrumbs
         items={[{ label: t("home", locale), href: "/" }, { label: brand.name }]}
       />
@@ -213,6 +213,6 @@ export default async function BrandPage({ params }: Props) {
           </p>
         </div>
       )}
-    </>
+    </div>
   );
 }

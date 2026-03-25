@@ -73,7 +73,7 @@ export default async function ManualPage({ params }: Props) {
   }
 
   return (
-    <>
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <Breadcrumbs
         items={[
           { label: t("home", locale), href: "/" },
@@ -115,6 +115,6 @@ export default async function ManualPage({ params }: Props) {
           })}
         </div>
       )}
-    </>
+    </div>
   );
 }

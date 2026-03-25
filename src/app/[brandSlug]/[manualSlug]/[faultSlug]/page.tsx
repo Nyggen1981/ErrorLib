@@ -125,6 +125,7 @@ export default async function FaultCodePage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
       />
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <TranslatedContent
       faultCodeId={fault.id}
       locale={locale}
@@ -250,6 +251,7 @@ export default async function FaultCodePage({ params }: Props) {
         </div>
       )}
     </TranslatedContent>
+    </div>
     </>
   );
 }

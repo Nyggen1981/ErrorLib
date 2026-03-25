@@ -90,7 +90,7 @@ export default async function RootLayout({
             </div>
           </nav>
         </header>
-        <main>{children}</main>
+        <main className="overflow-x-hidden">{children}</main>
         <footer className="bg-technical-900 text-technical-500">
           <div className="mx-auto max-w-6xl px-4 py-5 text-center text-xs sm:px-6">
             <p>{t("footerTitle", locale)}</p>
