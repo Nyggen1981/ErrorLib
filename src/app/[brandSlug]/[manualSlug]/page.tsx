@@ -35,13 +35,36 @@ export default async function ManualPage({ params }: Props) {
     where: { slug: manualSlug },
     include: {
       brand: true,
-      faultCodes: { orderBy: { code: "asc" } },
+      faultCodes: {
+        orderBy: { code: "asc" },
+        select: {
+          id: true,
+          code: true,
+          title: true,
+          description: true,
+          slug: true,
+          translations: true,
+        },
+      },
     },
   });
 
   if (!manual || manual.brand.slug !== brandSlug) notFound();
 
   const displayName = stripBrand(manual.name, manual.brand.name);
+
+  type TranslationEntry = { title?: string; description?: string };
+  type TranslationsMap = Record<string, TranslationEntry>;
+
+  function localized(fc: (typeof manual.faultCodes)[number]) {
+    if (locale === "en") return { title: fc.title, description: fc.description };
+    const map = (fc.translations as TranslationsMap) ?? {};
+    const tr = map[locale];
+    return {
+      title: tr?.title || fc.title,
+      description: tr?.description || fc.description,
+    };
+  }
 
   return (
     <>
@@ -72,15 +95,18 @@ export default async function ManualPage({ params }: Props) {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {manual.faultCodes.map((fc) => (
-            <FaultCodeCard
-              key={fc.id}
-              code={fc.code}
-              title={fc.title}
-              description={fc.description}
-              href={`/${manual.brand.slug}/${manual.slug}/${fc.slug}`}
-            />
-          ))}
+          {manual.faultCodes.map((fc) => {
+            const loc = localized(fc);
+            return (
+              <FaultCodeCard
+                key={fc.id}
+                code={fc.code}
+                title={loc.title}
+                description={loc.description}
+                href={`/${manual.brand.slug}/${manual.slug}/${fc.slug}`}
+              />
+            );
+          })}
         </div>
       )}
     </>
