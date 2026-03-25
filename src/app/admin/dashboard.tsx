@@ -171,6 +171,69 @@ function RetryButton({ brand }: { brand: string }) {
   );
 }
 
+function MassRetryButton({ logs }: { logs: MiningLogEntry[] }) {
+  const failedBrands = [
+    ...new Set(
+      logs
+        .filter(
+          (l) =>
+            l.status === "empty" ||
+            l.status === "failed" ||
+            l.status === "aborted" ||
+            (l.codesFound === 0 && l.status !== "skipped")
+        )
+        .map((l) => l.brand)
+    ),
+  ];
+
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{
+    queued: number;
+    brands: string[];
+  } | null>(null);
+
+  if (failedBrands.length === 0) return null;
+
+  async function handleMassRetry() {
+    setBusy(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/retry-mining", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ massRetry: true }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResult({ queued: data.queued ?? 0, brands: data.brands ?? [] });
+      }
+    } catch {}
+    setBusy(false);
+  }
+
+  if (result) {
+    return (
+      <span className="text-xs text-success">
+        {result.queued > 0
+          ? `Queued ${result.queued} brand(s): ${result.brands.join(", ")}`
+          : "All already queued"}
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleMassRetry}
+      disabled={busy}
+      className="rounded-lg bg-warning/20 px-3 py-1.5 text-xs font-medium text-warning transition hover:bg-warning/30 disabled:opacity-50"
+    >
+      {busy
+        ? "Queuing..."
+        : `⛏️ Retry All Failed/Empty (${failedBrands.length} brands)`}
+    </button>
+  );
+}
+
 function MiningQueuePanel({ initialQueue }: { initialQueue: QueueEntry[] }) {
   const [queue, setQueue] = useState<QueueEntry[]>(initialQueue);
   const [brandInput, setBrandInput] = useState("");
@@ -1340,9 +1403,10 @@ export function AdminDashboard({
       {/* Mining Log — full width */}
       <div className="mb-8">
         <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
-          <h2 className="mb-4 text-lg font-semibold text-white">
-            Mining Log
-          </h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">Mining Log</h2>
+            <MassRetryButton logs={miningLogs} />
+          </div>
           {miningLogs.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
