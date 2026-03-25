@@ -10,29 +10,29 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-      <h1 className="mb-8 text-3xl font-bold tracking-tight">
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <h1 className="mb-6 text-2xl font-bold tracking-tight text-technical-50">
         About ErrorLib
       </h1>
 
-      <div className="space-y-6 text-technical-700 leading-relaxed">
-        <p className="text-lg">
+      <div className="space-y-4 leading-relaxed text-technical-200">
+        <p className="text-base">
           ErrorLib is an independent technical reference library for industrial
           fault codes. We help field technicians, maintenance engineers, and
           automation professionals quickly diagnose and resolve equipment faults.
         </p>
 
-        <div className="rounded-2xl border border-technical-200 bg-white p-6 sm:p-8">
-          <h2 className="mb-4 text-xl font-semibold text-technical-900">
+        <div className="rounded-lg border border-technical-700 bg-technical-800 p-5">
+          <h2 className="mb-3 text-lg font-semibold text-technical-50">
             What We Do
           </h2>
-          <p className="mb-4">
+          <p className="mb-3 text-sm">
             Industrial equipment — variable frequency drives, PLCs, servo
             drives, softstarters — generates fault codes when something goes
             wrong. Finding the right troubleshooting information often means
             searching through hundreds of pages of manufacturer documentation.
           </p>
-          <p>
+          <p className="text-sm">
             ErrorLib compiles and indexes fault codes from publicly available
             manufacturer manuals, making them instantly searchable. Every fault
             code entry includes a clear description and step-by-step
@@ -40,17 +40,17 @@ export default function AboutPage() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-technical-200 bg-white p-6 sm:p-8">
-          <h2 className="mb-4 text-xl font-semibold text-technical-900">
+        <div className="rounded-lg border border-technical-700 bg-technical-800 p-5">
+          <h2 className="mb-3 text-lg font-semibold text-technical-50">
             Our Coverage
           </h2>
-          <p className="mb-4">
+          <p className="mb-3 text-sm">
             We currently cover major industrial automation brands including ABB,
             Siemens, Danfoss, Yaskawa, Schneider Electric, Vacon, SEW
             Eurodrive, Allen-Bradley, and more. Our database is continuously
             expanding based on user requests and industry demand.
           </p>
-          <p>
+          <p className="text-sm">
             Missing a brand or manual? Use our{" "}
             <a href="/#request" className="text-accent hover:underline">
               request form
@@ -59,28 +59,28 @@ export default function AboutPage() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-technical-200 bg-white p-6 sm:p-8">
-          <h2 className="mb-4 text-xl font-semibold text-technical-900">
+        <div className="rounded-lg border border-technical-700 bg-technical-800 p-5">
+          <h2 className="mb-3 text-lg font-semibold text-technical-50">
             For Professionals
           </h2>
-          <p className="mb-4">
+          <p className="mb-3 text-sm">
             ErrorLib is built for qualified professionals who work with
             industrial equipment daily. Our content is designed to be practical
             and actionable — not theoretical. Every troubleshooting step is
             something a technician can do on-site.
           </p>
-          <p className="text-sm text-technical-500">
+          <p className="text-xs text-technical-400">
             ErrorLib is not affiliated with or endorsed by any equipment
             manufacturer. Always consult official documentation and follow
             applicable safety standards when performing maintenance or repairs.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-technical-200 bg-white p-6 sm:p-8">
-          <h2 className="mb-4 text-xl font-semibold text-technical-900">
+        <div className="rounded-lg border border-technical-700 bg-technical-800 p-5">
+          <h2 className="mb-3 text-lg font-semibold text-technical-50">
             Contact
           </h2>
-          <p>
+          <p className="text-sm">
             For inquiries, partnerships, or feedback, reach us at{" "}
             <ContactEmail display="contact@errorlib.net" />.
           </p>

@@ -113,6 +113,7 @@ const dict = {
     es: "Guía completa de solución de problemas",
   },
   sourceManual: { en: "Source:", no: "Kilde:", de: "Quelle:", es: "Fuente:" },
+  viewOfficialPDF: { en: "View Official PDF", no: "Åpne offisiell PDF", de: "Offizielles PDF öffnen", es: "Ver PDF oficial" },
   translating: { en: "Translating...", no: "Oversetter...", de: "Übersetzen...", es: "Traduciendo..." },
 
   // ─── Brand page ───

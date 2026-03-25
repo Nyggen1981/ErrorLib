@@ -126,7 +126,7 @@ export default async function FaultCodePage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
       />
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-6">
       <TranslatedContent
       faultCodeId={fault.id}
       locale={locale}
@@ -150,40 +150,38 @@ export default async function FaultCodePage({ params }: Props) {
 
       <TranslatingBanner label={t("translating", locale)} />
 
-      {/* Hero */}
-      <section className="mb-8 rounded-2xl border border-technical-200 bg-white p-6 sm:p-10">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
-          <div className="flex min-w-[5rem] shrink-0 items-center justify-center rounded-xl bg-technical-900 px-4 py-5 sm:min-w-[6rem] sm:py-6">
-            <span
-              className={`whitespace-nowrap font-mono font-bold text-white ${
-                fault.code.length > 8
-                  ? "text-base sm:text-lg"
-                  : fault.code.length > 5
-                    ? "text-xl sm:text-2xl"
-                    : "text-2xl sm:text-3xl"
-              }`}
-            >
-              {fault.code}
-            </span>
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
-              <TranslatedTitle />
-            </h1>
-            <p className="mt-1 text-sm text-technical-400">
-              {fault.manual.brand.name} &middot; {displayName}
-            </p>
-          </div>
+      {/* Compressed Hero */}
+      <section className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+        <div className="flex shrink-0 items-center justify-center rounded-lg bg-accent/15 px-4 py-3 sm:px-5 sm:py-4">
+          <span
+            className={`whitespace-nowrap font-mono font-bold text-accent ${
+              fault.code.length > 8
+                ? "text-lg sm:text-xl"
+                : fault.code.length > 5
+                  ? "text-xl sm:text-2xl"
+                  : "text-2xl sm:text-3xl"
+            }`}
+          >
+            {fault.code}
+          </span>
+        </div>
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold tracking-tight text-technical-50 sm:text-2xl">
+            <TranslatedTitle />
+          </h1>
+          <p className="mt-0.5 text-xs text-technical-400">
+            {fault.manual.brand.name} &middot; {displayName}
+          </p>
         </div>
       </section>
 
-      <div className="grid gap-8 lg:grid-cols-3">
+      <div className="grid gap-5 lg:grid-cols-3">
         {/* Quick Action Card */}
         <aside className="lg:col-span-1">
-          <div className="sticky top-8 rounded-2xl border-2 border-accent bg-white p-6">
-            <div className="mb-4 flex items-center gap-2">
+          <div className="sticky top-4 rounded-lg border border-accent/40 bg-technical-800 p-5">
+            <div className="mb-3 flex items-center gap-2">
               <svg
-                className="h-5 w-5 text-accent"
+                className="h-4 w-4 text-accent"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth={2}
@@ -195,30 +193,30 @@ export default async function FaultCodePage({ params }: Props) {
                   d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"
                 />
               </svg>
-              <h2 className="text-lg font-bold text-accent">
+              <h2 className="text-base font-bold text-accent">
                 {t("priorityFix", locale)}
               </h2>
             </div>
-            <p className="mb-4 text-sm text-technical-500">
+            <p className="mb-3 text-xs text-technical-400">
               {t("priorityFixSubtitle", locale)}
             </p>
             <TranslatedPrioritySteps />
             <TranslatedMoreSteps label={t("moreStepsBelow", locale)} />
           </div>
-          <AdSlot slot="sidebar" className="mt-6" />
+          <AdSlot slot="sidebar" className="mt-4" />
         </aside>
 
         {/* Main Content */}
-        <div className="lg:col-span-2 space-y-8">
-          <section className="rounded-2xl border border-technical-200 bg-white p-6 sm:p-8">
-            <h2 className="mb-4 text-xl font-bold">
+        <div className="lg:col-span-2 space-y-5">
+          <section className="rounded-lg border border-technical-700 bg-technical-800 p-5 sm:p-6">
+            <h2 className="mb-3 text-lg font-bold text-technical-50">
               {t("whatDoesMean", locale)} {fault.code} {t("mean", locale)}
             </h2>
             <TranslatedDescription />
           </section>
 
-          <section className="rounded-2xl border border-technical-200 bg-white p-6 sm:p-8">
-            <h2 className="mb-6 text-xl font-bold">
+          <section className="rounded-lg border border-technical-700 bg-technical-800 p-5 sm:p-6">
+            <h2 className="mb-4 text-lg font-bold text-technical-50">
               {t("completeGuide", locale)}
             </h2>
             <TranslatedFullSteps />
@@ -228,32 +226,40 @@ export default async function FaultCodePage({ params }: Props) {
         </div>
       </div>
 
-      {/* Source link */}
-      {(fault.sourceUrl || fault.manual.pdfUrl) && (
-        <div className="mt-12 border-t border-technical-100 pt-4 text-center">
-          <a
-            href={fault.sourceUrl || fault.manual.pdfUrl!}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs text-technical-400 transition hover:text-technical-600"
-          >
-            {t("sourceManual", locale)} {fault.manual.brand.name} Manual
-            <svg
-              className="h-3 w-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
+      {/* Source Details */}
+      <div className="mt-6 rounded-lg border border-technical-700 bg-technical-800 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-xs text-technical-400">
+            <span className="font-medium text-technical-200">{t("sourceManual", locale)}</span>
+            {" "}{fault.manual.name}
+          </div>
+          {(fault.sourceUrl || fault.manual.pdfUrl) && (
+            <a
+              href={fault.sourceUrl || fault.manual.pdfUrl!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/25"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-              />
-            </svg>
-          </a>
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                />
+              </svg>
+              {fault.sourcePage
+                ? `Open Manual (Page ${fault.sourcePage})`
+                : t("viewOfficialPDF", locale)}
+            </a>
+          )}
         </div>
-      )}
+      </div>
     </TranslatedContent>
     </div>
     </>

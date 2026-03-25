@@ -10,15 +10,15 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-      <h1 className="mb-8 text-3xl font-bold tracking-tight">
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <h1 className="mb-6 text-2xl font-bold tracking-tight text-technical-50">
         Privacy Policy
       </h1>
-      <p className="mb-6 text-sm text-technical-500">
+      <p className="mb-4 text-xs text-technical-400">
         Last updated: March 2026
       </p>
 
-      <div className="prose prose-technical max-w-none space-y-6 text-technical-700 [&_h2]:mb-3 [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-technical-900 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5">
+      <div className="prose prose-invert max-w-none space-y-4 text-sm text-technical-200 [&_h2]:mb-2 [&_h2]:mt-6 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-technical-50 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_strong]:text-technical-100">
         <h2>1. Introduction</h2>
         <p>
           ErrorLib (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) operates errorlib.net, an industrial fault code

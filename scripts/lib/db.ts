@@ -62,7 +62,8 @@ export async function upsertFaultCode(
   title: string,
   description: string,
   fixSteps: string[],
-  sourceUrl?: string
+  sourceUrl?: string,
+  sourcePage?: number
 ) {
   const prisma = getPrisma();
 
@@ -73,7 +74,13 @@ export async function upsertFaultCode(
   if (existing) {
     return prisma.faultCode.update({
       where: { id: existing.id },
-      data: { title, description, fixSteps, ...(sourceUrl && { sourceUrl }) },
+      data: {
+        title,
+        description,
+        fixSteps,
+        ...(sourceUrl && { sourceUrl }),
+        ...(sourcePage != null && { sourcePage }),
+      },
     });
   }
 
@@ -84,7 +91,16 @@ export async function upsertFaultCode(
   while (true) {
     try {
       return await prisma.faultCode.create({
-        data: { code, slug, title, description, fixSteps, manualId, sourceUrl },
+        data: {
+          code,
+          slug,
+          title,
+          description,
+          fixSteps,
+          manualId,
+          sourceUrl,
+          sourcePage,
+        },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -129,6 +145,7 @@ type QueueItem = {
   description: string;
   fixSteps: string[];
   sourceUrl?: string;
+  sourcePage?: number;
 };
 
 let _queue: QueueItem[] = [];
@@ -154,7 +171,8 @@ export async function flushDbQueue(): Promise<number> {
           item.title,
           item.description,
           item.fixSteps,
-          item.sourceUrl
+          item.sourceUrl,
+          item.sourcePage
         );
         saved++;
       } catch (err) {

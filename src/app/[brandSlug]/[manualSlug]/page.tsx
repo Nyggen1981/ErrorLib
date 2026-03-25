@@ -73,7 +73,7 @@ export default async function ManualPage({ params }: Props) {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
       <Breadcrumbs
         items={[
           { label: t("home", locale), href: "/" },
@@ -82,11 +82,11 @@ export default async function ManualPage({ params }: Props) {
         ]}
       />
 
-      <div className="mb-10">
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-technical-50 sm:text-3xl">
           {manual.brand.name} {displayName}
         </h1>
-        <p className="mt-3 text-lg text-technical-500">
+        <p className="mt-1 text-sm text-technical-300">
           {manual.faultCodes.length}{" "}
           {manual.faultCodes.length === 1 ? t("faultCode", locale) : t("faultCodes", locale)}{" "}
           {t("documented", locale)}
@@ -94,13 +94,13 @@ export default async function ManualPage({ params }: Props) {
       </div>
 
       {manual.faultCodes.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-technical-300 bg-white p-12 text-center">
-          <p className="text-technical-400">
+        <div className="rounded-lg border border-dashed border-technical-600 p-10 text-center">
+          <p className="text-technical-300">
             {t("noFaultCodesManual", locale)}
           </p>
         </div>
       ) : (
-        <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           {manual.faultCodes.map((fc) => {
             const loc = localized(fc);
             return (

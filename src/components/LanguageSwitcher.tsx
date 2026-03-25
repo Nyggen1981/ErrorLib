@@ -26,13 +26,13 @@ export function LanguageSwitcher({
     <div className="flex items-center gap-1 text-xs">
       {visible.map(({ code, label }, i) => (
         <span key={code} className="flex items-center">
-          {i > 0 && <span className="mx-0.5 text-technical-600">|</span>}
+          {i > 0 && <span className="mx-0.5 text-technical-400">|</span>}
           <button
             onClick={() => handleChange(code)}
             className={`rounded px-1.5 py-0.5 transition ${
               current === code
                 ? "bg-accent/20 font-semibold text-accent"
-                : "text-technical-400 hover:text-white"
+                : "text-technical-300 hover:text-white"
             }`}
           >
             {label}

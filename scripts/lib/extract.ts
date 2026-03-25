@@ -9,6 +9,7 @@ export type ExtractedCode = {
   title: string;
   description: string;
   fixSteps: string[];
+  sourcePage?: number;
 };
 
 export type ExtractionResult = {
@@ -44,24 +45,41 @@ export async function preflight(): Promise<boolean> {
   }
 }
 
-const BATCH_PROMPT = `You are a senior industrial automation engineer analyzing extracted text from pages of an equipment manual.
+const BATCH_PROMPT = `You are a senior industrial automation engineer extracting fault codes from equipment manual pages. Your audience is field technicians who need precise, actionable data — not generic advice.
 
-You are receiving text content from multiple pages of the SAME manual. Analyze ALL pages together and extract EVERY unique fault code, error code, or alarm code.
+Analyze ALL pages and extract EVERY unique fault code, error code, or alarm code.
 
-For each unique code found, return:
-- "code": The exact alphanumeric fault code as printed (e.g. F0001, A0502, E016, 2310, FL1)
-- "title": A short human-readable title (e.g. "Overcurrent", "DC Bus Overvoltage")
-- "description": A detailed 2-4 sentence explanation of what causes this fault, what component is affected, and the risk if left unresolved. Write this for a field technician who needs to understand the problem quickly.
-- "fixSteps": An array of 3-5 specific, actionable troubleshooting steps in order of priority. Each step should be something a technician can physically do on-site (e.g. "Measure insulation resistance between motor phases and earth using a megger — expect >1 MΩ"). Combine redundant steps into high-impact bullet points.
+For each code, return:
+- "code": Exact alphanumeric fault code as printed (e.g. F0001, A0502, E016, 2310, FL1)
+- "title": Short human-readable title (e.g. "Overcurrent", "DC Bus Overvoltage")
+- "description": 2-4 sentences explaining the root cause, affected component, and risk. Include specific technical details: parameter numbers (e.g. "Parameter 99.06"), terminal names (e.g. "DI1", "X1:3"), and threshold values (e.g. "voltage >415V") when available in the source text.
+- "fixSteps": Array of 3-6 specific troubleshooting steps ordered by priority.
+- "sourcePage": The PDF page number where this fault code is primarily documented. Use the page number shown in the "--- Page X ---" header.
 
-Strict filtering rules:
-- Only extract ACTUAL technical fault/error/alarm codes (e.g. F0016, AL32, E005, 2310). Ignore page numbers, chapter numbers, index entries, part numbers, or marketing text.
-- Deduplicate: if the same code appears on multiple pages, merge the information into one entry.
-- If a code is missing BOTH a description AND fixSteps, discard it entirely.
-- If none of the pages contain any fault codes, return: { "codes": [] }
-- Return ONLY valid JSON. No markdown fences, no commentary, no explanation outside the JSON.
+MANDATORY RULES FOR fixSteps:
+1. Every step MUST reference something physically verifiable: a measurement, a parameter value, a terminal, a connection, a setting, or a DIP-switch position.
+2. BANNED generic phrases (NEVER use these unless they are verbatim numbered steps from the manual):
+   - "check wiring", "check connections", "inspect wiring"
+   - "allow motor to cool", "allow to cool down"
+   - "consult manufacturer", "refer to manual", "contact support"
+   - "replace if necessary", "repair or replace"
+   - "ensure proper ventilation"
+3. GOOD step examples:
+   - "Measure insulation resistance between motor phases U-V, V-W, U-W using a megger at 500VDC — expect >1 MΩ"
+   - "Check parameter 30.01 (Motor Nominal Current) — verify it matches the motor nameplate FLA value"
+   - "Measure DC bus voltage at terminals +UDC/-UDC — expect 540-750VDC for 400V input"
+   - "Verify DI1 run command signal at terminal X1:1 — expect 24VDC when run is active"
+4. If the manual lists specific parameter numbers, voltage/resistance values, or terminal designations for a fix, you MUST include them.
+5. If the source text provides no actionable fix data for a code beyond generic advice, return fewer steps rather than padding with generics.
 
-Output format: { "codes": [{ "code": "...", "title": "...", "description": "...", "fixSteps": ["...", "..."] }] }`;
+Strict filtering:
+- Only extract ACTUAL fault/error/alarm codes. Ignore page numbers, chapter numbers, part numbers, or marketing text.
+- Deduplicate: if the same code appears on multiple pages, merge all information into one entry.
+- If a code has NEITHER description NOR fixSteps, discard it.
+- If no fault codes exist in the text, return: { "codes": [] }
+- Return ONLY valid JSON. No markdown fences, no commentary.
+
+Output: { "codes": [{ "code": "...", "title": "...", "description": "...", "fixSteps": ["..."], "sourcePage": N }] }`;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -181,7 +199,7 @@ async function callGeminiPdf(
 
   const parts = [
     {
-      text: `${BATCH_PROMPT}\n\nThe attached PDF is an industrial equipment manual. Analyze every page and extract ALL fault/error/alarm codes you can find, including from tables and images.`,
+      text: `${BATCH_PROMPT}\n\nThe attached PDF is an industrial equipment manual. Analyze every page and extract ALL fault/error/alarm codes you can find, including from tables and images. For "sourcePage", use the actual PDF page number where each fault code appears.`,
     },
     {
       inlineData: {
@@ -255,10 +273,11 @@ export async function extractWithOcr(
         code: fc.code,
         title: fc.title,
         description: fc.description || `Fault ${fc.code}`,
-        fixSteps: (fc.fixSteps || ["Refer to manufacturer documentation."]).slice(0, 5),
+        fixSteps: (fc.fixSteps || []).slice(0, 6),
         sourceUrl,
+        sourcePage: fc.sourcePage,
       });
-      log.detail(`    [PDF-OCR] ${fc.code} - ${fc.title}`);
+      log.detail(`    [PDF-OCR] ${fc.code} - ${fc.title}${fc.sourcePage ? ` (p.${fc.sourcePage})` : ""}`);
     }
 
     const saved = await flushDbQueue();
@@ -350,20 +369,17 @@ export async function extractAndSave(
     );
   }
 
-  // Enqueue all codes for background DB write
   for (const fc of capped) {
     enqueueFaultCode({
       manualId,
       code: fc.code,
       title: fc.title,
       description: fc.description || `Fault ${fc.code}`,
-      fixSteps: (fc.fixSteps || ["Refer to manufacturer documentation."]).slice(
-        0,
-        5
-      ),
+      fixSteps: (fc.fixSteps || []).slice(0, 6),
       sourceUrl,
+      sourcePage: fc.sourcePage,
     });
-    log.detail(`    ${fc.code} - ${fc.title}`);
+    log.detail(`    ${fc.code} - ${fc.title}${fc.sourcePage ? ` (p.${fc.sourcePage})` : ""}`);
   }
 
   // Final flush for this manual

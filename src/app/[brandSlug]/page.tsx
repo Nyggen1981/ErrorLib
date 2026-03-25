@@ -142,16 +142,16 @@ export default async function BrandPage({ params }: Props) {
   const totalCodes = groups.reduce((s, g) => s + g.totalCodes, 0);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
       <Breadcrumbs
         items={[{ label: t("home", locale), href: "/" }, { label: brand.name }]}
       />
 
-      <div className="mb-10">
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-technical-50 sm:text-3xl">
           {brand.name}
         </h1>
-        <p className="mt-3 text-lg text-technical-500">
+        <p className="mt-1 text-sm text-technical-300">
           {groups.length > 0
             ? `${groups.length} ${groups.length === 1 ? t("modelFamily", locale) : t("modelFamilies", locale)} \u00B7 ${totalCodes} ${t("faultCodes", locale)}`
             : t("noFaultCodesYet", locale)}
@@ -159,7 +159,7 @@ export default async function BrandPage({ params }: Props) {
       </div>
 
       {groups.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {groups.map((group) => {
             const primary = group.manuals.reduce((best, m) =>
               m._count.faultCodes > best._count.faultCodes ? m : best
@@ -171,28 +171,28 @@ export default async function BrandPage({ params }: Props) {
               <a
                 key={group.family}
                 href={`/${brand.slug}/${primary.slug}`}
-                className="group flex flex-col rounded-xl border border-technical-200 bg-white p-6 transition-all hover:border-technical-300 hover:shadow-md"
+                className="group flex flex-col rounded-lg border border-technical-700 bg-technical-800 p-5 transition-all hover:border-technical-500 hover:bg-technical-700"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-xl font-bold tracking-tight group-hover:text-accent transition-colors">
+                  <h2 className="text-lg font-bold tracking-tight text-technical-50 transition-colors group-hover:text-accent">
                     {group.family}
                   </h2>
                   {manualCount > 1 && (
-                    <span className="shrink-0 rounded-full bg-technical-100 px-2.5 py-0.5 text-xs font-medium text-technical-600">
+                    <span className="shrink-0 rounded bg-technical-600 px-2 py-0.5 text-xs font-medium text-technical-200">
                       {manualCount} {t("manuals", locale)}
                     </span>
                   )}
                 </div>
 
-                <p className="mt-2 text-lg font-semibold tabular-nums text-technical-700">
+                <p className="mt-1.5 text-lg font-semibold tabular-nums text-accent">
                   {group.totalCodes}{" "}
-                  <span className="text-sm font-normal text-technical-400">
+                  <span className="text-sm font-normal text-technical-300">
                     {group.totalCodes === 1 ? t("faultCode", locale) : t("faultCodes", locale)}
                   </span>
                 </p>
 
                 {hasVariants && (
-                  <p className="mt-2 text-xs text-technical-400">
+                  <p className="mt-1.5 text-xs text-technical-400">
                     {t("includes", locale)} {group.variants.slice(0, 4).join(", ")}
                     {group.variants.length > 4
                       ? ` +${group.variants.length - 4} more`
@@ -204,11 +204,11 @@ export default async function BrandPage({ params }: Props) {
           })}
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed border-technical-300 bg-white p-12 text-center">
-          <p className="text-technical-500">
+        <div className="rounded-lg border border-dashed border-technical-600 p-10 text-center">
+          <p className="text-technical-300">
             {t("noFaultCodesExtracted", locale)} {brand.name}.
           </p>
-          <p className="mt-1 text-sm text-technical-400">
+          <p className="mt-1 text-xs text-technical-400">
             {t("docBeingIndexed", locale)}
           </p>
         </div>

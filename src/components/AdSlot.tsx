@@ -9,7 +9,7 @@ export function AdSlot({
 
   return (
     <div
-      className={`overflow-hidden rounded-xl border border-dashed border-technical-200 bg-technical-50 ${className}`}
+      className={`overflow-hidden rounded-lg border border-dashed border-technical-600 bg-technical-800/50 ${className}`}
       data-ad-slot={slot}
     >
       <div className="flex items-center justify-center px-4 py-6 text-[10px] uppercase tracking-wider text-technical-400">

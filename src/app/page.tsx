@@ -56,23 +56,23 @@ export default async function HomePage() {
   return (
     <>
       {/* Hero */}
-      <section className="hero-grid bg-technical-900 px-4 py-16 sm:px-6 sm:py-20">
+      <section className="hero-grid bg-technical-900 px-4 py-10 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-6xl text-center">
-          <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
+          <h1 className="text-3xl font-extrabold tracking-tight text-technical-50 sm:text-5xl">
             {t("heroTitle", locale)}
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-technical-400">
+          <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed text-technical-300">
             {t("heroSubtitle", locale)}
           </p>
-          <div className="mx-auto mt-8 max-w-2xl">
+          <div className="mx-auto mt-6 max-w-2xl">
             <SearchBar variant="hero" locale={locale} />
           </div>
           {totalCodes > 0 && (
-            <div className="mt-6 flex items-center justify-center gap-6 text-sm">
-              <span className="rounded-full bg-white/10 px-4 py-1.5 font-medium tabular-nums text-white">
+            <div className="mt-4 flex items-center justify-center gap-4 text-sm">
+              <span className="rounded-full border border-technical-600 px-3 py-1 font-medium tabular-nums text-technical-200">
                 {totalCodes.toLocaleString()} {t("faultCodes", locale)}
               </span>
-              <span className="rounded-full bg-white/10 px-4 py-1.5 font-medium tabular-nums text-white">
+              <span className="rounded-full border border-technical-600 px-3 py-1 font-medium tabular-nums text-technical-200">
                 {activeBrands.length} {t("brands", locale).toLowerCase()}
               </span>
             </div>
@@ -80,16 +80,15 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        {/* Brand Cards */}
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         {activeBrands.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-technical-300 bg-white p-12 text-center">
-            <p className="text-technical-400">
+          <div className="rounded-lg border border-dashed border-technical-600 p-10 text-center">
+            <p className="text-technical-300">
               {t("noBrandsYet", locale)}
             </p>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {activeBrands.map((brand) => {
               const colorClass =
                 BRAND_COLORS[brand.name.toLowerCase()] ?? "border-t-technical-400";
@@ -98,19 +97,19 @@ export default async function HomePage() {
                 <a
                   key={brand.id}
                   href={`/${brand.slug}`}
-                  className={`group rounded-xl border border-technical-200 border-t-2 ${colorClass} bg-white p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg`}
+                  className={`group rounded-lg border border-technical-700 border-t-2 ${colorClass} bg-technical-800 p-5 transition-all hover:border-technical-500 hover:bg-technical-700`}
                 >
-                  <h2 className="text-xl font-bold tracking-tight text-technical-900 group-hover:text-accent transition-colors">
+                  <h2 className="text-lg font-bold tracking-tight text-technical-50 transition-colors group-hover:text-accent">
                     {brand.name}
                   </h2>
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className="rounded-full bg-technical-100 px-2.5 py-0.5 text-xs font-medium text-technical-600">
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="rounded bg-technical-700 px-2 py-0.5 text-xs font-medium text-technical-200">
                       {brand.populatedManuals}{" "}
                       {brand.populatedManuals === 1
                         ? t("manual", locale)
                         : t("manuals", locale)}
                     </span>
-                    <span className="rounded-full bg-technical-100 px-2.5 py-0.5 text-xs font-medium text-technical-700">
+                    <span className="rounded bg-technical-700 px-2 py-0.5 text-xs font-medium text-accent">
                       {brand.totalFaultCodes} {t("codes", locale)}
                     </span>
                   </div>
@@ -120,28 +119,27 @@ export default async function HomePage() {
           </div>
         )}
 
-        {/* Under Documentation */}
         {comingSoon.length > 0 && (
-          <section className="mt-14">
-            <div className="mb-5">
-              <h2 className="text-lg font-semibold text-technical-700">
+          <section className="mt-8">
+            <div className="mb-3">
+              <h2 className="text-base font-semibold text-technical-200">
                 {t("underDocumentation", locale)}
               </h2>
-              <p className="mt-1 text-sm text-technical-400">
+              <p className="mt-0.5 text-xs text-technical-400">
                 {t("underDocSubtitle", locale)}
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {comingSoon.map((req) => (
                 <div
                   key={req.id}
-                  className="rounded-xl border border-technical-100 bg-white/60 px-5 py-4 transition-all duration-200 hover:border-technical-200 hover:shadow-sm"
+                  className="rounded-lg border border-technical-700 bg-technical-800/50 px-4 py-3"
                 >
-                  <p className="font-medium text-technical-600">
+                  <p className="text-sm font-medium text-technical-200">
                     {req.brand}
                   </p>
                   {req.voteCount >= 20 && (
-                    <p className="mt-1 text-xs text-technical-400">
+                    <p className="mt-0.5 text-xs text-technical-400">
                       {req.voteCount} {t("requests", locale)}
                     </p>
                   )}

@@ -14,21 +14,21 @@ export function FaultCodeCard({
   return (
     <a
       href={href}
-      className="group block overflow-hidden rounded-xl border border-technical-200 bg-white p-5 transition-all hover:border-technical-300 hover:shadow-md"
+      className="group block overflow-hidden rounded-lg border border-technical-700 bg-technical-800 p-4 transition-all hover:border-technical-500 hover:bg-technical-700"
     >
-      <div className="mb-2 flex min-w-0 items-center gap-3">
+      <div className="mb-1.5 flex min-w-0 items-center gap-3">
         <span
-          className={`shrink-0 whitespace-nowrap rounded-md bg-technical-900 px-3 py-1 font-mono font-bold text-white ${
-            code.length > 8 ? "text-xs" : code.length > 5 ? "text-sm" : "text-sm"
+          className={`shrink-0 whitespace-nowrap rounded bg-accent/15 px-2.5 py-0.5 font-mono font-bold text-accent ${
+            code.length > 8 ? "text-xs" : "text-sm"
           }`}
         >
           {code}
         </span>
-        <h3 className="min-w-0 truncate font-semibold text-technical-800 group-hover:text-accent transition-colors">
+        <h3 className="min-w-0 truncate font-semibold text-technical-50 transition-colors group-hover:text-accent">
           {title}
         </h3>
       </div>
-      <p className="line-clamp-2 break-words text-sm leading-relaxed text-technical-500">
+      <p className="line-clamp-2 break-words text-sm leading-relaxed text-technical-300">
         {description}
       </p>
     </a>

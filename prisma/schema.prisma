@@ -39,6 +39,7 @@ model FaultCode {
   description  String
   fixSteps     String[]
   sourceUrl    String?
+  sourcePage   Int?
   translations Json     @default("{}")
   manual       Manual   @relation(fields: [manualId], references: [id], onDelete: Cascade)
   manualId     String

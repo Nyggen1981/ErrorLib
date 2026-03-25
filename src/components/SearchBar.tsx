@@ -146,7 +146,7 @@ export function SearchBar({
         }`}
       >
         <MagIcon
-          className={`shrink-0 text-technical-500 ${isHero ? "h-5 w-5" : "h-4 w-4"}`}
+          className={`shrink-0 text-technical-300 ${isHero ? "h-5 w-5" : "h-4 w-4"}`}
         />
         <input
           type="text"
@@ -158,7 +158,7 @@ export function SearchBar({
               ? t("searchHeroPlaceholder", locale)
               : t("searchPlaceholder", locale)
           }
-          className={`w-full bg-transparent text-white placeholder-technical-500 outline-none ${
+          className={`w-full bg-transparent text-white placeholder-technical-300 outline-none ${
             isHero ? "text-base sm:text-lg" : "text-sm"
           }`}
         />

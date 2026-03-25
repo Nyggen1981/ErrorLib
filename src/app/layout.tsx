@@ -50,7 +50,7 @@ export default async function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-technical-50 text-technical-900 antialiased">
+      <body className="bg-technical-900 text-technical-100 antialiased">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -68,11 +68,11 @@ export default async function RootLayout({
             }),
           }}
         />
-        <header className="bg-technical-900">
-          <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
+        <header className="border-b border-technical-700 bg-technical-800">
+          <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
             <a href="/" className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent">
-                <span className="font-mono text-sm font-bold text-white">
+                <span className="font-mono text-sm font-bold text-technical-900">
                   EL
                 </span>
               </div>
@@ -95,16 +95,16 @@ export default async function RootLayout({
           </nav>
         </header>
         <main className="overflow-x-hidden">{children}</main>
-        <footer className="bg-technical-900 text-technical-500">
-          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
+        <footer className="border-t border-technical-700 bg-technical-800">
+          <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-technical-300">
               <span>{t("footerTitle", locale)}</span>
-              <span className="hidden text-technical-700 sm:inline">|</span>
-              <a href="/about" className="transition hover:text-technical-300">About</a>
-              <a href="/privacy" className="transition hover:text-technical-300">Privacy</a>
-              <a href="/terms" className="transition hover:text-technical-300">Terms</a>
+              <span className="hidden text-technical-500 sm:inline">|</span>
+              <a href="/about" className="transition hover:text-accent">About</a>
+              <a href="/privacy" className="transition hover:text-accent">Privacy</a>
+              <a href="/terms" className="transition hover:text-accent">Terms</a>
             </div>
-            <p className="mx-auto mt-3 max-w-3xl text-center text-[11px] leading-relaxed text-technical-600">
+            <p className="mx-auto mt-2 max-w-3xl text-center text-[10px] leading-relaxed text-technical-400">
               {t("disclaimer", locale)}
             </p>
           </div>
