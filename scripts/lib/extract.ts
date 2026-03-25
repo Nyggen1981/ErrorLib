@@ -94,33 +94,42 @@ async function callGeminiText(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
 
-      if (
+      const isRateLimit =
         msg.includes("429") ||
         msg.includes("quota") ||
         msg.includes("Too Many Requests") ||
-        msg.includes("RESOURCE_EXHAUSTED")
-      ) {
-        const retryAfter = parseRetryDelay(msg) ?? 60 * (attempt + 1);
-        if (attempt < maxRetries) {
-          const queued = queueSize();
-          if (queued > 0) {
-            log.warn(
-              `  Rate limited. Flushing ${queued} queued DB writes while waiting ${retryAfter}s (retry ${attempt + 1}/${maxRetries})...`
-            );
-          } else {
-            log.warn(
-              `  Rate limited. Waiting ${retryAfter}s before retry ${attempt + 1}/${maxRetries}...`
-            );
-          }
-          const [flushed] = await Promise.all([
-            flushDbQueue(),
-            sleep(retryAfter * 1000),
-          ]);
-          if (flushed > 0) {
-            log.detail(`  Flushed ${flushed} codes to Neon during rate-limit wait`);
-          }
-          continue;
+        msg.includes("RESOURCE_EXHAUSTED");
+
+      const isTransient =
+        msg.includes("503") ||
+        msg.includes("Service Unavailable") ||
+        msg.includes("UNAVAILABLE") ||
+        msg.includes("currently experiencing") ||
+        msg.includes("overloaded");
+
+      if ((isRateLimit || isTransient) && attempt < maxRetries) {
+        const retryAfter = isRateLimit
+          ? (parseRetryDelay(msg) ?? 60 * (attempt + 1))
+          : 30 * (attempt + 1);
+        const reason = isRateLimit ? "Rate limited" : "Service unavailable (503)";
+        const queued = queueSize();
+        if (queued > 0) {
+          log.warn(
+            `  ${reason}. Flushing ${queued} queued DB writes while waiting ${retryAfter}s (retry ${attempt + 1}/${maxRetries})...`
+          );
+        } else {
+          log.warn(
+            `  ${reason}. Waiting ${retryAfter}s before retry ${attempt + 1}/${maxRetries}...`
+          );
         }
+        const [flushed] = await Promise.all([
+          flushDbQueue(),
+          sleep(retryAfter * 1000),
+        ]);
+        if (flushed > 0) {
+          log.detail(`  Flushed ${flushed} codes to Neon during wait`);
+        }
+        continue;
       }
 
       throw err;
