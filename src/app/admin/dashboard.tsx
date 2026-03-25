@@ -1235,6 +1235,135 @@ function LinkHealthPanel() {
   );
 }
 
+function GoogleIndexingPanel() {
+  const [stats, setStats] = useState<{
+    total: number;
+    indexed: number;
+    remaining: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [pushing, setPushing] = useState(false);
+  const [result, setResult] = useState<{
+    pushed: number;
+    failed: number;
+    remaining: number;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/push-indexing")
+      .then((r) => r.json())
+      .then((d) => setStats(d))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handlePush() {
+    setPushing(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/push-indexing", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setResult(data);
+        setStats((prev) =>
+          prev
+            ? {
+                ...prev,
+                indexed: prev.indexed + (data.pushed ?? 0),
+                remaining: data.remaining ?? prev.remaining,
+              }
+            : prev
+        );
+      } else {
+        setResult({ pushed: 0, failed: 0, remaining: stats?.remaining ?? 0 });
+      }
+    } catch {}
+    setPushing(false);
+  }
+
+  const pct =
+    stats && stats.total > 0
+      ? Math.round((stats.indexed / stats.total) * 100)
+      : 0;
+
+  return (
+    <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Google Indexing</h2>
+          <p className="mt-0.5 text-xs text-technical-400">
+            Push new fault code URLs to Google Indexing API
+          </p>
+        </div>
+        <button
+          onClick={handlePush}
+          disabled={pushing || (stats?.remaining === 0)}
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-technical-900 transition hover:bg-accent/80 disabled:opacity-50"
+        >
+          {pushing ? (
+            <span className="flex items-center gap-2">
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Pushing...
+            </span>
+          ) : (
+            "Push New Codes to Google"
+          )}
+        </button>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-technical-400 animate-pulse">Loading...</p>
+      ) : stats ? (
+        <div>
+          <div className="mb-3 flex items-center justify-between text-sm">
+            <span className="text-technical-300">
+              {stats.indexed} / {stats.total} indexed
+            </span>
+            <span className="text-xs tabular-nums text-technical-500">{pct}%</span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-technical-700">
+            <div
+              className="h-full rounded-full bg-accent transition-all"
+              style={{ width: `${Math.max(pct, 1)}%` }}
+            />
+          </div>
+          {stats.remaining > 0 && (
+            <p className="mt-2 text-xs text-technical-400">
+              {stats.remaining} codes waiting to be pushed
+            </p>
+          )}
+        </div>
+      ) : null}
+
+      {result && !pushing && (
+        <div className="mt-3 rounded-lg border border-technical-600 bg-technical-900 p-3 text-sm">
+          <div className="flex flex-wrap gap-4">
+            <span className="text-success">
+              Pushed: <strong>{result.pushed}</strong>
+            </span>
+            {result.failed > 0 && (
+              <span className="text-danger">
+                Failed: <strong>{result.failed}</strong>
+              </span>
+            )}
+            <span className="text-technical-300">
+              Remaining: <strong>{result.remaining}</strong>
+            </span>
+          </div>
+        </div>
+      )}
+
+      <p className="mt-3 text-[10px] text-technical-500">
+        Requires <code className="rounded bg-technical-700 px-1">GOOGLE_INDEXING_KEY</code> env var
+        with a service account JSON key that has Indexing API access.
+      </p>
+    </div>
+  );
+}
+
 type Suggestion = {
   series: string;
   category: string;
@@ -1662,9 +1791,10 @@ export function AdminDashboard({
         </div>
       </div>
 
-      {/* Link Health */}
-      <div className="mb-8">
+      {/* Link Health + Google Indexing */}
+      <div className="mb-8 grid gap-8 lg:grid-cols-2">
         <LinkHealthPanel />
+        <GoogleIndexingPanel />
       </div>
 
       {/* Expand Brand */}

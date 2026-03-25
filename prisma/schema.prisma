@@ -43,6 +43,7 @@ model FaultCode {
   sourceUrl    String?
   sourcePage   Int?
   translations Json     @default("{}")
+  isIndexed    Boolean  @default(false)
   manual       Manual   @relation(fields: [manualId], references: [id], onDelete: Cascade)
   manualId     String
   createdAt    DateTime @default(now())
