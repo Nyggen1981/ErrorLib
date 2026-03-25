@@ -169,51 +169,26 @@ const MAX_CHARS_PER_REQUEST = 20_000;
 const MAX_PAGES_PER_CHUNK = 20;
 const MAX_CODES_PER_MANUAL = 60;
 const RATE_LIMIT_GAP_MS = 35_000;
-const OCR_MIN_TEXT_CHARS = 100;
-const OCR_MAX_PAGES = 30;
 
-async function renderPdfPageToImage(
-  pdfPath: string,
-  pageNum: number
-): Promise<Buffer | null> {
-  try {
-    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    const data = new Uint8Array(fs.readFileSync(pdfPath));
-    const doc = await pdfjs.getDocument({ data, useSystemFonts: true }).promise;
-    const page = await doc.getPage(pageNum);
+const MAX_PDF_BYTES_PER_CHUNK = 15 * 1024 * 1024;
 
-    const viewport = page.getViewport({ scale: 2.0 });
-    const { createCanvas } = await import("canvas");
-    const canvas = createCanvas(viewport.width, viewport.height);
-    const ctx = canvas.getContext("2d");
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (page as any).render({
-      canvasContext: ctx,
-      viewport,
-    }).promise;
-
-    page.cleanup();
-    await doc.destroy();
-    return canvas.toBuffer("image/png");
-  } catch (err) {
-    log.warn(`  [OCR] Failed to render page ${pageNum}: ${err instanceof Error ? err.message : err}`);
-    return null;
-  }
-}
-
-async function callGeminiVision(
-  images: { data: string; mimeType: string }[],
+async function callGeminiPdf(
+  pdfBase64: string,
   maxRetries = 3
 ): Promise<ExtractionResult> {
   const genAI = getGemini();
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const parts = [
-    { text: `${BATCH_PROMPT}\n\nThe following images are pages from an industrial equipment manual. Analyze them and extract all fault/error/alarm codes you can find.` },
-    ...images.map((img) => ({
-      inlineData: { data: img.data, mimeType: img.mimeType },
-    })),
+    {
+      text: `${BATCH_PROMPT}\n\nThe attached PDF is an industrial equipment manual. Analyze every page and extract ALL fault/error/alarm codes you can find, including from tables and images.`,
+    },
+    {
+      inlineData: {
+        data: pdfBase64,
+        mimeType: "application/pdf",
+      },
+    },
   ];
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -234,7 +209,7 @@ async function callGeminiVision(
 
       if (isRetryable && attempt < maxRetries) {
         const wait = 30 * (attempt + 1);
-        log.warn(`  [OCR] ${msg.substring(0, 80)} — retrying in ${wait}s (${attempt + 1}/${maxRetries})`);
+        log.warn(`  [PDF-OCR] ${msg.substring(0, 80)} — retrying in ${wait}s (${attempt + 1}/${maxRetries})`);
         await sleep(wait * 1000);
         continue;
       }
@@ -249,79 +224,50 @@ export async function extractWithOcr(
   manualId: string,
   sourceUrl?: string
 ): Promise<number> {
-  log.info(`[OCR] Starting vision-based extraction for ${path.basename(pdfPath)}`);
+  const filename = path.basename(pdfPath);
+  log.info(`[PDF-OCR] Sending raw PDF to Gemini: ${filename}`);
 
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const data = new Uint8Array(fs.readFileSync(pdfPath));
-  const doc = await pdfjs.getDocument({ data, useSystemFonts: true }).promise;
-  const totalPages = doc.numPages;
-  await doc.destroy();
+  const pdfBuffer = fs.readFileSync(pdfPath);
+  const sizeMB = (pdfBuffer.length / 1024 / 1024).toFixed(1);
+  log.info(`[PDF-OCR] File size: ${sizeMB} MB`);
 
-  const pagesToProcess = Math.min(totalPages, OCR_MAX_PAGES);
-  log.info(`[OCR] Rendering ${pagesToProcess} of ${totalPages} pages as images...`);
-
-  const imageChunks: { data: string; mimeType: string }[][] = [];
-  let currentBatch: { data: string; mimeType: string }[] = [];
-
-  for (let i = 1; i <= pagesToProcess; i++) {
-    const buf = await renderPdfPageToImage(pdfPath, i);
-    if (!buf) continue;
-
-    currentBatch.push({
-      data: buf.toString("base64"),
-      mimeType: "image/png",
-    });
-
-    if (currentBatch.length >= 5) {
-      imageChunks.push(currentBatch);
-      currentBatch = [];
-    }
-  }
-  if (currentBatch.length > 0) imageChunks.push(currentBatch);
-
-  if (imageChunks.length === 0) {
-    log.warn("[OCR] No pages could be rendered");
+  if (pdfBuffer.length > MAX_PDF_BYTES_PER_CHUNK) {
+    log.warn(`[PDF-OCR] PDF is too large (${sizeMB} MB > 15 MB limit). Skipping.`);
     return 0;
   }
 
-  log.info(`[OCR] Sending ${imageChunks.length} batch(es) to Gemini Vision...`);
-  let allCodes: ExtractedCode[] = [];
+  const pdfBase64 = pdfBuffer.toString("base64");
 
-  for (let c = 0; c < imageChunks.length; c++) {
-    if (c > 0) {
-      log.detail(`  [OCR] Rate-limit gap before batch ${c + 1}...`);
-      await sleep(RATE_LIMIT_GAP_MS);
+  try {
+    const result = await callGeminiPdf(pdfBase64);
+
+    if (result.codes.length === 0) {
+      log.detail(`[PDF-OCR] No fault codes found in ${filename}`);
+      return 0;
     }
 
-    try {
-      const result = await callGeminiVision(imageChunks[c]);
-      if (result.codes.length > 0) {
-        log.success(`  [OCR] Batch ${c + 1}: ${result.codes.length} codes found`);
-        allCodes.push(...result.codes);
-      } else {
-        log.detail(`  [OCR] Batch ${c + 1}: no codes found`);
-      }
-    } catch (err) {
-      log.warn(`  [OCR] Batch ${c + 1} failed: ${err instanceof Error ? err.message.substring(0, 150) : err}`);
+    log.success(`[PDF-OCR] Gemini found ${result.codes.length} codes in ${filename}`);
+
+    const capped = filterAndCap(result.codes, MAX_CODES_PER_MANUAL);
+    for (const fc of capped) {
+      enqueueFaultCode({
+        manualId,
+        code: fc.code,
+        title: fc.title,
+        description: fc.description || `Fault ${fc.code}`,
+        fixSteps: (fc.fixSteps || ["Refer to manufacturer documentation."]).slice(0, 5),
+        sourceUrl,
+      });
+      log.detail(`    [PDF-OCR] ${fc.code} - ${fc.title}`);
     }
-  }
 
-  const capped = filterAndCap(allCodes, MAX_CODES_PER_MANUAL);
-  for (const fc of capped) {
-    enqueueFaultCode({
-      manualId,
-      code: fc.code,
-      title: fc.title,
-      description: fc.description || `Fault ${fc.code}`,
-      fixSteps: (fc.fixSteps || ["Refer to manufacturer documentation."]).slice(0, 5),
-      sourceUrl,
-    });
-    log.detail(`    [OCR] ${fc.code} - ${fc.title}`);
+    const saved = await flushDbQueue();
+    if (saved > 0) log.success(`  [PDF-OCR] Pushed ${saved} codes to Neon`);
+    return saved;
+  } catch (err) {
+    log.warn(`[PDF-OCR] Failed: ${err instanceof Error ? err.message.substring(0, 200) : err}`);
+    return 0;
   }
-
-  const saved = await flushDbQueue();
-  if (saved > 0) log.success(`  [OCR] Pushed ${saved} codes to Neon`);
-  return saved;
 }
 
 export async function extractAndSave(
