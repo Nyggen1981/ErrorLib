@@ -5,7 +5,7 @@ import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 
 type BrandResult = { name: string; slug: string; manualCount: number };
-type CodeResult = { code: string; title: string; href: string };
+type CodeResult = { code: string; title: string; manual?: string; href: string };
 type FaultGroup = { brand: string; brandSlug: string; codes: CodeResult[] };
 type SearchResults = { brands: BrandResult[]; faultGroups: FaultGroup[] } | null;
 
@@ -232,12 +232,19 @@ export function SearchBar({
                       onClick={() => { logSearch(query, group.codes.length); setOpen(false); }}
                       className="flex items-center gap-3 rounded-lg px-3 py-2 transition hover:bg-technical-800"
                     >
-                      <span className="shrink-0 rounded bg-technical-700 px-2 py-0.5 font-mono text-xs font-bold text-accent">
+                      <span className="shrink-0 self-start rounded bg-technical-700 px-2 py-0.5 font-mono text-xs font-bold text-accent">
                         {fc.code}
                       </span>
-                      <span className="min-w-0 truncate text-sm text-technical-300">
-                        {fc.title}
-                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm text-technical-300">
+                          {fc.title}
+                        </p>
+                        {fc.manual && (
+                          <p className="truncate text-xs text-technical-500">
+                            {fc.manual}
+                          </p>
+                        )}
+                      </div>
                     </a>
                   ))}
                   {group.codes.length > 6 && (

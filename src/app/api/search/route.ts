@@ -95,13 +95,17 @@ export async function GET(req: NextRequest) {
         b.name.toLowerCase().includes(q.toLowerCase())
       );
 
+  function stripBrand(manualName: string, brandName: string): string {
+    const re = new RegExp(`^${brandName}\\s+`, "i");
+    return manualName.replace(re, "").trim() || manualName;
+  }
+
   const grouped: Record<
     string,
     {
       brand: string;
       brandSlug: string;
-      seen: Set<string>;
-      codes: { code: string; title: string; href: string }[];
+      codes: { code: string; title: string; manual: string; href: string }[];
     }
   > = {};
 
@@ -111,16 +115,13 @@ export async function GET(req: NextRequest) {
       grouped[bName] = {
         brand: bName,
         brandSlug: fc.manual.brand.slug,
-        seen: new Set(),
         codes: [],
       };
     }
-    const dedup = `${fc.code}::${fc.title.toLowerCase()}`;
-    if (grouped[bName].seen.has(dedup)) continue;
-    grouped[bName].seen.add(dedup);
     grouped[bName].codes.push({
       code: fc.code,
       title: fc.title,
+      manual: stripBrand(fc.manual.name, bName),
       href: `/${fc.manual.brand.slug}/${fc.manual.slug}/${fc.slug}`,
     });
   }
