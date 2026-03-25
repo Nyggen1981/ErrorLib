@@ -7,8 +7,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ results: [] });
   }
 
-  const query = q.toLowerCase();
-
   const [faultCodes, brands] = await Promise.all([
     prisma.faultCode.findMany({
       where: {
@@ -67,6 +65,12 @@ export async function GET(req: NextRequest) {
       href: `/${fc.manual.brand.slug}/${fc.manual.slug}/${fc.slug}`,
     });
   }
+
+  const totalResults = faultCodes.length + brands.length;
+
+  prisma.searchLog
+    .create({ data: { query: q, results: totalResults } })
+    .catch(() => {});
 
   return NextResponse.json({
     results: {

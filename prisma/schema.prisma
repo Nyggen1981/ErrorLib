@@ -79,6 +79,16 @@ model SiteSetting {
   value String
 }
 
+model SearchLog {
+  id        String   @id @default(cuid())
+  query     String
+  results   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([query])
+}
+
 model UserRequest {
   id        String   @id @default(cuid())
   brand     String

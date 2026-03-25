@@ -469,6 +469,114 @@ function UserRequestsPanel({
   );
 }
 
+type TopSearch = { query: string; count: number; avgResults: number };
+type RecentSearch = { query: string; results: number; createdAt: string };
+
+function SearchLogsPanel() {
+  const [topSearches, setTopSearches] = useState<TopSearch[]>([]);
+  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/admin/search-logs")
+      .then((r) => r.json())
+      .then((data) => {
+        setTopSearches(data.topSearches ?? []);
+        setRecentSearches(data.recentSearches ?? []);
+        setTotalCount(data.totalCount ?? 0);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-white">Top Searches</h2>
+        <span className="rounded-full bg-accent/20 px-2.5 py-0.5 text-xs font-medium tabular-nums text-accent">
+          {totalCount} searches (7d)
+        </span>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-technical-400 animate-pulse">Loading...</p>
+      ) : topSearches.length === 0 ? (
+        <p className="text-sm text-technical-500">No searches logged yet.</p>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Top searches table */}
+          <div>
+            <p className="mb-2 text-xs font-medium text-technical-400">
+              Most searched (last 7 days)
+            </p>
+            <div className="space-y-1">
+              {topSearches.map((s, i) => (
+                <div
+                  key={s.query}
+                  className="flex items-center justify-between rounded-lg px-3 py-2 text-sm odd:bg-technical-900/50"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-5 text-right text-xs tabular-nums text-technical-600">
+                      {i + 1}
+                    </span>
+                    <span className="font-medium text-technical-200">
+                      {s.query}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${
+                        s.avgResults === 0
+                          ? "bg-warning/20 text-warning"
+                          : "bg-technical-700 text-technical-400"
+                      }`}
+                    >
+                      {s.avgResults === 0 ? "0 results" : `~${s.avgResults} results`}
+                    </span>
+                    <span className="text-xs tabular-nums text-technical-500">
+                      {s.count}×
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recent searches */}
+          <div>
+            <p className="mb-2 text-xs font-medium text-technical-400">
+              Recent searches
+            </p>
+            <div className="space-y-1">
+              {recentSearches.slice(0, 15).map((s, i) => (
+                <div
+                  key={`${s.query}-${i}`}
+                  className="flex items-center justify-between rounded-lg px-3 py-1.5 text-sm odd:bg-technical-900/50"
+                >
+                  <span className="text-technical-300">{s.query}</span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-xs tabular-nums ${
+                        s.results === 0 ? "text-warning" : "text-technical-500"
+                      }`}
+                    >
+                      {s.results} hits
+                    </span>
+                    <span className="text-[10px] text-technical-600">
+                      {timeAgo(s.createdAt)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LanguageSettingsPanel() {
   const ALL_LANGS = [
     { code: "en", label: "English", flag: "🇬🇧" },
@@ -1007,6 +1115,11 @@ export function AdminDashboard({
             </p>
           )}
         </div>
+      </div>
+
+      {/* Search Logs */}
+      <div className="mb-8">
+        <SearchLogsPanel />
       </div>
 
       {/* Language Settings + Translation Management */}
