@@ -232,7 +232,7 @@ export function SearchBar({
                       onClick={() => { logSearch(query, group.codes.length); setOpen(false); }}
                       className="flex items-start gap-3 rounded-lg px-3 py-2 transition hover:bg-technical-800"
                     >
-                      <span className="w-12 shrink-0 rounded bg-technical-700 px-2 py-0.5 text-center font-mono text-xs font-bold text-accent">
+                      <span className="inline-flex w-14 shrink-0 items-center justify-center rounded bg-technical-700 py-0.5 font-mono text-xs font-bold text-accent">
                         {fc.code}
                       </span>
                       <div className="min-w-0">
