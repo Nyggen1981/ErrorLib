@@ -27,6 +27,41 @@ function MagIcon({ className }: { className?: string }) {
   );
 }
 
+function NoResultsView({
+  query,
+  locale,
+  logSearch,
+  onClose,
+}: {
+  query: string;
+  locale: Locale;
+  logSearch: (q: string, results: number) => void;
+  onClose: () => void;
+}) {
+  const logged = useRef(false);
+  useEffect(() => {
+    if (!logged.current) {
+      logged.current = true;
+      logSearch(query, 0);
+    }
+  }, [query, logSearch]);
+
+  return (
+    <div className="px-5 py-6 text-center">
+      <p className="text-sm text-technical-400">
+        {t("noResults", locale)}
+      </p>
+      <a
+        href="/#request"
+        className="mt-2 inline-block text-sm font-medium text-accent transition hover:text-accent/80"
+        onClick={onClose}
+      >
+        {t("noResultsCta", locale)} →
+      </a>
+    </div>
+  );
+}
+
 export function SearchBar({
   variant = "header",
   locale,
@@ -42,6 +77,14 @@ export function SearchBar({
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const isHero = variant === "hero";
+
+  const logSearch = useCallback((q: string, resultCount: number) => {
+    fetch("/api/search/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: q, results: resultCount }),
+    }).catch(() => {});
+  }, []);
 
   const fetchResults = useCallback(async (q: string) => {
     if (q.length < 2) {
@@ -146,18 +189,7 @@ export function SearchBar({
           } overflow-y-auto`}
         >
           {!hasResults ? (
-            <div className="px-5 py-6 text-center">
-              <p className="text-sm text-technical-400">
-                {t("noResults", locale)}
-              </p>
-              <a
-                href="/#request"
-                className="mt-2 inline-block text-sm font-medium text-accent transition hover:text-accent/80"
-                onClick={() => setOpen(false)}
-              >
-                {t("noResultsCta", locale)} →
-              </a>
-            </div>
+            <NoResultsView query={query} locale={locale} logSearch={logSearch} onClose={() => setOpen(false)} />
           ) : (
             <div className="divide-y divide-technical-800">
               {/* Brand matches */}
@@ -170,7 +202,7 @@ export function SearchBar({
                     <a
                       key={b.slug}
                       href={`/${b.slug}`}
-                      onClick={() => setOpen(false)}
+                      onClick={() => { logSearch(query, 1); setOpen(false); }}
                       className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-technical-200 transition hover:bg-technical-800"
                     >
                       <span className="font-medium">{b.name}</span>
@@ -197,7 +229,7 @@ export function SearchBar({
                     <a
                       key={fc.href}
                       href={fc.href}
-                      onClick={() => setOpen(false)}
+                      onClick={() => { logSearch(query, group.codes.length); setOpen(false); }}
                       className="flex items-center gap-3 rounded-lg px-3 py-2 transition hover:bg-technical-800"
                     >
                       <span className="shrink-0 rounded bg-technical-700 px-2 py-0.5 font-mono text-xs font-bold text-accent">
@@ -211,7 +243,7 @@ export function SearchBar({
                   {group.codes.length > 6 && (
                     <a
                       href={`/${group.brandSlug}`}
-                      onClick={() => setOpen(false)}
+                      onClick={() => { logSearch(query, group.codes.length); setOpen(false); }}
                       className="block px-3 py-1.5 text-xs text-accent transition hover:text-accent/80"
                     >
                       + {group.codes.length - 6} more from {group.brand} →

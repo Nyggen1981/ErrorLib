@@ -120,12 +120,6 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const totalResults = faultCodes.length + matchedBrands.length;
-
-  prisma.searchLog
-    .create({ data: { query: q, results: totalResults } })
-    .catch(() => {});
-
   return NextResponse.json({
     results: {
       brands: matchedBrands.slice(0, 5).map((b) => ({
