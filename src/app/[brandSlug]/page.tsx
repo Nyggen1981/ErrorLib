@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { SeriesFaultList } from "@/components/SeriesFaultList";
 import type { SeriesFaultItem } from "@/components/SeriesFaultList";
+import { RequestForm } from "@/app/request-form";
 import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
 import type { Locale } from "@/lib/i18n";
@@ -419,6 +420,8 @@ export default async function BrandPage({ params, searchParams }: Props) {
           </p>
         </div>
       )}
+
+      <RequestForm locale={locale} defaultBrand={brand.name} />
     </div>
   );
 }

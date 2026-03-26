@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
+import { RequestForm } from "@/app/request-form";
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 
@@ -32,7 +33,6 @@ function NoResultsView({
   query,
   locale,
   logSearch,
-  onClose,
 }: {
   query: string;
   locale: Locale;
@@ -47,18 +47,21 @@ function NoResultsView({
     }
   }, [query, logSearch]);
 
+  const words = query.trim().split(/\s+/);
+  const guessedBrand = words.length >= 1 ? words[0] : "";
+  const guessedModel = words.length >= 2 ? words.slice(1).join(" ") : "";
+
   return (
-    <div className="px-5 py-6 text-center">
-      <p className="text-sm text-technical-400">
-        {t("noResults", locale)}
-      </p>
-      <a
-        href="/#request"
-        className="mt-2 inline-block text-sm font-medium text-accent transition hover:text-accent/80"
-        onClick={onClose}
-      >
-        {t("noResultsCta", locale)} →
-      </a>
+    <div>
+      <div className="px-5 pt-4 text-center">
+        <p className="text-sm text-technical-400">{t("noResults", locale)}</p>
+      </div>
+      <RequestForm
+        locale={locale}
+        defaultBrand={guessedBrand}
+        defaultModel={guessedModel}
+        compact
+      />
     </div>
   );
 }

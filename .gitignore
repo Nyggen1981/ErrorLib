@@ -9,3 +9,4 @@ scripts/mined-manuals.json
 scripts/.text-cache
 *.db
 *.db-journal
+public/sitemap.xml

@@ -4,9 +4,19 @@ import { useState } from "react";
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 
-export function RequestForm({ locale }: { locale: Locale }) {
-  const [brand, setBrand] = useState("");
-  const [model, setModel] = useState("");
+export function RequestForm({
+  locale,
+  defaultBrand = "",
+  defaultModel = "",
+  compact = false,
+}: {
+  locale: Locale;
+  defaultBrand?: string;
+  defaultModel?: string;
+  compact?: boolean;
+}) {
+  const [brand, setBrand] = useState(defaultBrand);
+  const [model, setModel] = useState(defaultModel);
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<
     "idle" | "loading" | "created" | "voted" | "error"
@@ -52,6 +62,71 @@ export function RequestForm({ locale }: { locale: Locale }) {
   }
 
   const showSuccess = status === "created" || status === "voted";
+
+  if (compact) {
+    return (
+      <div className="px-5 py-5">
+        <p className="mb-1 text-sm font-semibold text-white">
+          {t("missingManual", locale)}
+        </p>
+        <p className="mb-3 text-xs text-technical-400">
+          {t("requestSubtitle", locale)}
+        </p>
+
+        {showSuccess ? (
+          <div className="rounded-lg border border-success/20 bg-success/10 p-3 text-center">
+            <p className="text-xs font-medium text-success">
+              {status === "voted"
+                ? `${t("thankVoted", locale)} ${voteCount} ${t("votes", locale)}.`
+                : t("thankCreated", locale)}
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                placeholder={t("brandPlaceholder", locale)}
+                required
+                className="flex-1 rounded-md border border-technical-600 bg-technical-800 px-3 py-1.5 text-xs text-white placeholder-technical-400 outline-none transition focus:border-accent"
+              />
+              <input
+                type="text"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder={t("modelPlaceholder", locale)}
+                className="flex-1 rounded-md border border-technical-600 bg-technical-800 px-3 py-1.5 text-xs text-white placeholder-technical-400 outline-none transition focus:border-accent"
+              />
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={t("emailPlaceholder", locale)}
+                className="flex-1 rounded-md border border-technical-600 bg-technical-800 px-3 py-1.5 text-xs text-white placeholder-technical-400 outline-none transition focus:border-accent"
+              />
+              <button
+                type="submit"
+                disabled={status === "loading" || !brand.trim()}
+                className="rounded-md bg-accent px-4 py-1.5 text-xs font-bold text-technical-900 transition hover:bg-accent/90 disabled:opacity-50"
+              >
+                {status === "loading" ? t("sending", locale) : t("requestBtn", locale)}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {status === "error" && (
+          <p className="mt-2 text-center text-xs text-danger">
+            {t("somethingWrong", locale)}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <section id="request" className="hero-grid bg-technical-800 px-4 py-14 sm:px-6">

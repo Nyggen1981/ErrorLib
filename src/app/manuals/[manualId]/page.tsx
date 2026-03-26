@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { AdSlot } from "@/components/AdSlot";
 import type { Metadata } from "next";
 
 type Props = {
@@ -42,7 +43,8 @@ export default async function ManualViewerPage({ params, searchParams }: Props) 
   const codesHref = `/${manual.brand.slug}/${manual.slug}`;
 
   return (
-    <div className="flex min-h-[calc(100vh-64px)] flex-col">
+    <div className="flex flex-col" style={{ height: "calc(100vh - 64px)" }}>
+      {/* Header bar */}
       <div className="flex items-center justify-between border-b border-technical-700 bg-technical-800 px-4 py-2.5 sm:px-6">
         <div className="min-w-0">
           <h1 className="truncate text-sm font-semibold text-technical-100">
@@ -70,11 +72,16 @@ export default async function ManualViewerPage({ params, searchParams }: Props) 
         </div>
       </div>
 
+      {/* PDF iframe — shrinks to leave room for ad footer when enabled */}
       <iframe
         src={pdfSrc}
-        className="flex-1 w-full bg-technical-900"
+        className="w-full bg-technical-900"
+        style={{ flex: 1, minHeight: 0 }}
         title={`${manual.brand.name} ${manual.name}`}
       />
+
+      {/* Sticky ad footer — only on PDF viewer pages */}
+      <AdSlot slot="viewer-footer" />
     </div>
   );
 }
