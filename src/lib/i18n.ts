@@ -81,6 +81,8 @@ const dict = {
   },
   brandPlaceholder: { en: "Brand (e.g. Mitsubishi)", no: "Merke (f.eks. Mitsubishi)", de: "Marke (z.B. Mitsubishi)", es: "Marca (ej. Mitsubishi)" },
   modelPlaceholder: { en: "Model (optional)", no: "Modell (valgfritt)", de: "Modell (optional)", es: "Modelo (opcional)" },
+  modelRequiredPlaceholder: { en: "Model name (e.g. ACS880)", no: "Modellnavn (f.eks. ACS880)", de: "Modellname (z.B. ACS880)", es: "Nombre del modelo (ej. ACS880)" },
+  emailShort: { en: "Email (optional)", no: "E-post (valgfritt)", de: "E-Mail (optional)", es: "Email (opcional)" },
   emailPlaceholder: {
     en: "Your email (optional \u2014 get notified when it's ready)",
     no: "Din e-post (valgfritt \u2014 bli varslet når den er klar)",

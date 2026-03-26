@@ -25,9 +25,12 @@ export function RequestForm({
   >("idle");
   const [voteCount, setVoteCount] = useState(0);
 
+  const isBrandPage = variant === "brand";
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!brand.trim()) return;
+    if (isBrandPage && !model.trim()) return;
 
     setStatus("loading");
 
@@ -55,7 +58,7 @@ export function RequestForm({
         setStatus("created");
       }
 
-      setBrand("");
+      if (!isBrandPage) setBrand("");
       setModel("");
       setEmail("");
     } catch {
@@ -151,24 +154,24 @@ export function RequestForm({
               onSubmit={handleSubmit}
               className="flex flex-col gap-2 sm:flex-row sm:items-center"
             >
-              <input type="hidden" value={brand} />
               <input
                 type="text"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder={t("modelPlaceholder", locale)}
+                placeholder={t("modelRequiredPlaceholder", locale)}
+                required
                 className="flex-1 rounded-lg border border-technical-600 bg-technical-800 px-3 py-2 text-sm text-white placeholder-technical-400 outline-none transition focus:border-accent"
               />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={t("emailPlaceholder", locale)}
+                placeholder={t("emailShort", locale)}
                 className="flex-1 rounded-lg border border-technical-600 bg-technical-800 px-3 py-2 text-sm text-white placeholder-technical-400 outline-none transition focus:border-accent"
               />
               <button
                 type="submit"
-                disabled={status === "loading" || !brand.trim()}
+                disabled={status === "loading" || !model.trim()}
                 className="shrink-0 rounded-lg bg-accent px-5 py-2 text-sm font-bold text-technical-900 transition hover:bg-accent/90 disabled:opacity-50"
               >
                 {status === "loading"
