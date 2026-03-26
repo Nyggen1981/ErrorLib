@@ -17,6 +17,18 @@ const BRAND_COLORS: Record<string, string> = {
   "rockwell / allen-bradley": "border-t-amber-500",
 };
 
+function normalizeBrandKey(name: string): string {
+  const compact = name
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Collapse known aliases/noise variants into one display bucket.
+  if (compact.startsWith("mitsubishi electric")) return "mitsubishi electric";
+  return compact;
+}
+
 export default async function HomePage() {
   const locale = await getLocale();
 
@@ -44,11 +56,33 @@ export default async function HomePage() {
     populatedManuals: b.manuals.filter((m) => m._count.faultCodes > 0).length,
   }));
 
-  const activeBrands = brandsWithStats.filter((b) => b.totalFaultCodes > 0);
-  const activeNames = new Set(activeBrands.map((b) => b.name.toLowerCase()));
+  const activeBrandsRaw = brandsWithStats.filter((b) => b.totalFaultCodes > 0);
+  const grouped = new Map<string, (typeof activeBrandsRaw)[number]>();
+
+  for (const brand of activeBrandsRaw) {
+    const key = normalizeBrandKey(brand.name);
+    const existing = grouped.get(key);
+
+    if (!existing) {
+      grouped.set(key, brand);
+      continue;
+    }
+
+    // Keep one card per normalized brand, aggregating metrics.
+    grouped.set(key, {
+      ...existing,
+      totalFaultCodes: existing.totalFaultCodes + brand.totalFaultCodes,
+      populatedManuals: existing.populatedManuals + brand.populatedManuals,
+    });
+  }
+
+  const activeBrands = Array.from(grouped.values()).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+  const activeNames = new Set(activeBrands.map((b) => normalizeBrandKey(b.name)));
 
   const comingSoon = plannedRequests.filter(
-    (r) => !activeNames.has(r.brand.toLowerCase())
+    (r) => !activeNames.has(normalizeBrandKey(r.brand))
   );
 
   const totalCodes = activeBrands.reduce((s, b) => s + b.totalFaultCodes, 0);
@@ -94,7 +128,7 @@ export default async function HomePage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {activeBrands.map((brand) => {
               const colorClass =
-                BRAND_COLORS[brand.name.toLowerCase()] ?? "border-t-technical-400";
+                BRAND_COLORS[normalizeBrandKey(brand.name)] ?? "border-t-technical-400";
 
               return (
                 <a
