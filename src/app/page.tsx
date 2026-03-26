@@ -58,7 +58,7 @@ export default async function HomePage() {
       {/* Hero */}
       <section className="hero-grid bg-technical-900 px-4 py-10 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-6xl text-center">
-          <h1 className="text-3xl font-extrabold tracking-tight text-technical-50 sm:text-5xl">
+          <h1 className="text-2xl font-extrabold tracking-tight text-technical-50 sm:text-4xl">
             {t("heroTitle", locale)}
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed text-technical-300">
