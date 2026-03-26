@@ -10,7 +10,6 @@ import {
   TranslatingBanner,
 } from "@/components/FaultCodeContent";
 import { AdSlot } from "@/components/AdSlot";
-import { SupportProjectCallout } from "@/components/SupportProjectCallout";
 import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
 import type { Metadata } from "next";
@@ -348,9 +347,17 @@ export default async function FaultCodePage({ params }: Props) {
                 ) : null}
               </div>
             </div>
+            <p className="mt-2.5 text-[10px] leading-snug text-technical-500">
+              <a
+                href="https://buymeacoffee.com/errorlib"
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                className="underline decoration-technical-600/70 underline-offset-2 transition hover:text-technical-400 hover:decoration-technical-500"
+              >
+                Keep ErrorLib free – Support with a coffee ☕️
+              </a>
+            </p>
           </div>
-
-          <SupportProjectCallout />
         </TranslatedContent>
       </div>
     </>
