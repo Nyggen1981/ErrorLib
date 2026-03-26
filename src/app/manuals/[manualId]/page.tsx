@@ -36,9 +36,8 @@ export default async function ManualViewerPage({ params, searchParams }: Props) 
 
   if (!manual || !manual.pdfUrl || manual.isBroken) notFound();
 
-  const pdfSrc = page
-    ? `${manual.pdfUrl}#page=${page}`
-    : manual.pdfUrl;
+  const proxySrc = `/api/pdf-proxy?id=${manualId}`;
+  const pdfSrc = page ? `${proxySrc}#page=${page}` : proxySrc;
 
   const codesHref = `/${manual.brand.slug}/${manual.slug}`;
 
