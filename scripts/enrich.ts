@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { PrismaClient } from "../generated/prisma/client.js";
+import { PrismaClient, Prisma } from "../generated/prisma/client.js";
 import { PrismaNeon } from "@prisma/adapter-neon";
 
 const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! });
@@ -8,47 +8,66 @@ const prisma = new PrismaClient({ adapter });
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-const ENRICH_PROMPT = `You are given a list of industrial fault codes that already exist in our database. Each entry has a numeric "ref" identifier. Your job is to ENRICH each one with additional structured data.
+const FORMATTING_RULES = `TEXT FORMATTING RULES (apply to ALL string fields):
+1. Parameters: Write as a single unbroken token — "P1-54" NOT "P1 -54" or "P1- 54".
+2. Parentheses: Every ( MUST have a closing ). Use only for short technical references like "(24VDC)".
+3. No double spaces. No leading/trailing whitespace.
+4. Do NOT use markdown bold (**).`;
 
-CRITICAL: You MUST return the "ref" number EXACTLY as provided for each entry. This is how we match your output back to our database. Do NOT omit, rename, or change the ref values.
+function buildPrompt(needsCauses: boolean, needsSteps: boolean): string {
+  const fields: string[] = [
+    `- "ref": The numeric reference ID (MUST match input exactly)`,
+  ];
+  if (needsCauses)
+    fields.push(
+      `- "causes": Array of 3-5 strings explaining WHY this fault occurs. Be specific to industrial equipment. Include parameter numbers where relevant.`
+    );
+  if (needsSteps)
+    fields.push(
+      `- "fixSteps": Array of 3-6 detailed repair steps. Each MUST reference a specific measurement, parameter, terminal, or verifiable action. BANNED: "check wiring", "consult manual", "replace if necessary".`
+    );
 
-For each fault code provided, return:
-- "ref": The numeric reference ID (MUST match the input ref exactly — this is mandatory)
-- "causes": Array of 3-5 strings explaining WHY this fault typically occurs. Be specific to industrial automation equipment. Include parameter numbers where relevant (e.g. "Parameter P1-54 set below motor rated torque"). Examples: "Motor cable insulation breakdown due to aging or mechanical damage", "Supply voltage sag below 340V during heavy load transients", "Encoder feedback cable shielding fault causing signal noise".
-- "fixSteps": Array of 3-6 detailed, numbered repair steps. Every step MUST reference a specific measurement, parameter, terminal, or verifiable action. BANNED: "check wiring", "consult manual", "replace if necessary", "ensure proper ventilation".
+  const outputExample: Record<string, unknown> = { ref: 1 };
+  if (needsCauses) outputExample.causes = ["..."];
+  if (needsSteps) outputExample.fixSteps = ["..."];
 
-TEXT FORMATTING RULES (apply to ALL string fields):
-1. Parameters: Write as a single unbroken token — "P1-54" NOT "P1 -54" or "P1- 54". No spaces between prefix, hyphen, and number.
-2. Parentheses: Every opening ( MUST have a closing ). Never leave dangling parentheses. Use parentheses ONLY for short technical references like "(Brake torque)" or "(24VDC)". Do NOT wrap entire sentences in parentheses.
-3. No double spaces. No leading/trailing whitespace in array items.
-4. Do NOT use markdown bold (**) in any field — we handle formatting in the UI.
+  return `You are given industrial fault codes. Each has a numeric "ref" identifier. Return enriched data.
 
-If you cannot produce specific causes/tools for a code, return shorter arrays rather than padding with generic content.
+CRITICAL: Return the "ref" number EXACTLY as provided.
 
-Return ONLY valid JSON. No markdown fences, no commentary.
-Output: { "codes": [{ "ref": 1, "causes": ["..."], "fixSteps": ["..."] }] }`;
+For each fault code, return:
+${fields.join("\n")}
 
-const BATCH_SIZE = 15;
-const RATE_GAP_MS = 35_000;
+${FORMATTING_RULES}
+
+Return shorter arrays rather than generic padding. Return ONLY valid JSON, no markdown.
+Output: { "codes": [${JSON.stringify(outputExample)}] }`;
+}
+
+const args = process.argv.slice(2);
+const BATCH_SIZE = args.includes("--small") ? 5 : 25;
+const RATE_GAP_MS = 4_000;
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-type EnrichInput = { ref: number; code: string; title: string; description: string };
-type EnrichOutput = { ref: number; causes: string[]; fixSteps: string[] };
+type EnrichInput = { ref: number; code: string; title: string; desc: string };
+type EnrichOutput = { ref: number; causes?: string[]; fixSteps?: string[] };
 
 async function callGemini(
   codesContext: EnrichInput[],
+  needsCauses: boolean,
+  needsSteps: boolean,
   maxRetries = 3
 ): Promise<EnrichOutput[]> {
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
   const codeList = codesContext
-    .map((c) => `- ref=${c.ref}: Code "${c.code}", Title "${c.title}" — ${c.description.substring(0, 200)}`)
+    .map((c) => `- ref=${c.ref}: "${c.code}" — ${c.title}${needsSteps ? ` | ${c.desc.substring(0, 120)}` : ""}`)
     .join("\n");
 
-  const prompt = `${ENRICH_PROMPT}\n\nFault codes to enrich:\n${codeList}`;
+  const prompt = `${buildPrompt(needsCauses, needsSteps)}\n\nFault codes:\n${codeList}`;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -58,8 +77,8 @@ async function callGemini(
       const parsed = JSON.parse(cleaned);
       return (parsed.codes || []).map((c: Record<string, unknown>) => ({
         ref: Number(c.ref),
-        causes: c.causes || [],
-        fixSteps: c.fixSteps || [],
+        causes: (c.causes as string[]) || undefined,
+        fixSteps: (c.fixSteps as string[]) || undefined,
       }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -69,7 +88,7 @@ async function callGemini(
         msg.includes("UNAVAILABLE") || msg.includes("overloaded");
 
       if (retryable && attempt < maxRetries) {
-        const wait = 30 * (attempt + 1);
+        const wait = 15 * (attempt + 1);
         console.log(`  ⏳ ${msg.substring(0, 60)}... retrying in ${wait}s (${attempt + 1}/${maxRetries})`);
         await sleep(wait * 1000);
         continue;
@@ -81,7 +100,6 @@ async function callGemini(
 }
 
 async function main() {
-  const args = process.argv.slice(2);
   const brandFilter = args.find((a) => a.startsWith("--brand="))?.split("=")[1];
   const manualFilter = args.find((a) => a.startsWith("--manual="))?.split("=")[1];
   const dryRun = args.includes("--dry");
@@ -94,10 +112,17 @@ async function main() {
   const where: Record<string, unknown> = {};
 
   if (!force) {
-    where.OR = [
-      { causes: { equals: [] } },
-      { causes: { isEmpty: true } },
-    ];
+    // Prisma's isEmpty/equals can miss empty PostgreSQL arrays via Neon adapter.
+    // Use raw SQL to get reliable IDs, then filter.
+    const emptyIds = await prisma.$queryRaw<{ id: string }[]>(
+      Prisma.sql`SELECT id FROM "FaultCode" WHERE array_length(causes, 1) IS NULL OR array_length("fixSteps", 1) IS NULL`
+    );
+    if (emptyIds.length === 0) {
+      console.log("✅ All codes are already enriched!");
+      return;
+    }
+    where.id = { in: emptyIds.map((r) => r.id) };
+    console.log(`📌 Found ${emptyIds.length} codes via SQL that need enrichment`);
   }
 
   if (brandFilter) {
@@ -121,102 +146,130 @@ async function main() {
 
   const unenriched = await prisma.faultCode.findMany({
     where,
-    include: { manual: { include: { brand: true } } },
+    select: {
+      id: true,
+      code: true,
+      title: true,
+      description: true,
+      causes: true,
+      fixSteps: true,
+      manualId: true,
+      manual: { select: { name: true, brand: { select: { name: true } } } },
+    },
     orderBy: { createdAt: "asc" },
   });
 
-  console.log(`📊 Found ${unenriched.length} fault codes needing enrichment`);
-  if (unenriched.length === 0) {
+  // Determine what each code actually needs
+  type CodeWithNeeds = (typeof unenriched)[number] & {
+    needsCauses: boolean;
+    needsSteps: boolean;
+  };
+
+  const codes: CodeWithNeeds[] = unenriched
+    .map((fc) => ({
+      ...fc,
+      needsCauses: !fc.causes || fc.causes.length === 0,
+      needsSteps: !fc.fixSteps || fc.fixSteps.length === 0,
+    }))
+    .filter((fc) => fc.needsCauses || fc.needsSteps);
+
+  const onlyCauses = codes.filter((c) => c.needsCauses && !c.needsSteps).length;
+  const onlySteps = codes.filter((c) => !c.needsCauses && c.needsSteps).length;
+  const both = codes.filter((c) => c.needsCauses && c.needsSteps).length;
+
+  console.log(`📊 Found ${codes.length} fault codes needing enrichment`);
+  console.log(`   Causes only: ${onlyCauses} | Steps only: ${onlySteps} | Both: ${both}`);
+  if (codes.length === 0) {
     console.log("✅ All codes are already enriched!");
     return;
   }
 
-  const manualGroups = new Map<string, typeof unenriched>();
-  for (const fc of unenriched) {
-    const key = fc.manualId;
-    if (!manualGroups.has(key)) manualGroups.set(key, []);
-    manualGroups.get(key)!.push(fc);
-  }
+  // Group into "causes-only" and "both" batches for efficiency
+  const causesOnlyQueue = codes.filter((c) => c.needsCauses && !c.needsSteps);
+  const needsBothQueue = codes.filter((c) => c.needsSteps);
 
-  console.log(`📦 Spread across ${manualGroups.size} manuals\n`);
+  const totalBatches =
+    Math.ceil(causesOnlyQueue.length / BATCH_SIZE) +
+    Math.ceil(needsBothQueue.length / BATCH_SIZE);
+
+  console.log(`📦 ${totalBatches} API calls needed (batch size ${BATCH_SIZE})\n`);
 
   let totalEnriched = 0;
   let totalFailed = 0;
-  let manualIdx = 0;
+  let batchIdx = 0;
 
-  for (const [manualId, codes] of manualGroups) {
-    manualIdx++;
-    const manual = codes[0].manual;
-    const label = `${manual.brand.name} / ${manual.name}`;
-    console.log(`\n[${manualIdx}/${manualGroups.size}] 📖 ${label} (${codes.length} codes)`);
+  async function processBatch(
+    batch: CodeWithNeeds[],
+    needsCauses: boolean,
+    needsSteps: boolean,
+    label: string
+  ) {
+    batchIdx++;
+    if (batchIdx > 1) await sleep(RATE_GAP_MS);
 
-    for (let batchStart = 0; batchStart < codes.length; batchStart += BATCH_SIZE) {
-      const batch = codes.slice(batchStart, batchStart + BATCH_SIZE);
-      const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
-      const totalBatches = Math.ceil(codes.length / BATCH_SIZE);
+    const tag = needsSteps ? "causes+steps" : "causes-only";
+    console.log(`[${batchIdx}/${totalBatches}] ${tag} — ${batch.length} codes (${label})`);
 
-      if (batchStart > 0) {
-        console.log(`  ⏳ Rate-limit gap (${RATE_GAP_MS / 1000}s)...`);
-        await sleep(RATE_GAP_MS);
-      }
+    try {
+      const enriched = await callGemini(
+        batch.map((fc, i) => ({
+          ref: i,
+          code: fc.code,
+          title: fc.title,
+          desc: fc.description,
+        })),
+        needsCauses,
+        needsSteps
+      );
 
-      console.log(`  Batch ${batchNum}/${totalBatches}: enriching ${batch.length} codes...`);
+      const enrichMap = new Map(enriched.map((e) => [e.ref, e]));
 
-      try {
-        const enriched = await callGemini(
-          batch.map((fc, i) => ({
-            ref: batchStart + i,
-            code: fc.code,
-            title: fc.title,
-            description: fc.description,
-          }))
-        );
+      for (let i = 0; i < batch.length; i++) {
+        const fc = batch[i];
+        const data = enrichMap.get(i);
+        if (!data) { totalFailed++; continue; }
 
-        const enrichMap = new Map(enriched.map((e) => [e.ref, e]));
-
-        for (let i = 0; i < batch.length; i++) {
-          const fc = batch[i];
-          const ref = batchStart + i;
-          const data = enrichMap.get(ref);
-          if (!data) {
-            totalFailed++;
-            continue;
-          }
-
-          if (dryRun) {
-            console.log(`    [DRY] ${fc.code}: ${data.causes?.length || 0} causes, ${data.fixSteps?.length || 0} steps`);
-            totalEnriched++;
-            continue;
-          }
-
-          try {
-            const update: Record<string, unknown> = {};
-            if (data.causes?.length > 0) update.causes = data.causes;
-            if (data.fixSteps?.length > 0) update.fixSteps = data.fixSteps;
-            if (Object.keys(update).length > 0) {
-              update.translations = {};
-              await prisma.faultCode.update({
-                where: { id: fc.id },
-                data: update,
-              });
-              totalEnriched++;
-            }
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            console.log(`    ❌ ${fc.code}: ${msg.substring(0, 80)}`);
-            totalFailed++;
-          }
+        if (dryRun) {
+          console.log(`  [DRY] ${fc.code}: ${data.causes?.length ?? 0}c ${data.fixSteps?.length ?? 0}s`);
+          totalEnriched++;
+          continue;
         }
 
-        console.log(`  ✅ Batch ${batchNum} done — Enriched: ${totalEnriched}, Failed: ${totalFailed}`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.log(`  ❌ Batch ${batchNum} failed: ${msg.substring(0, 120)}`);
-        totalFailed += batch.length;
+        try {
+          const update: Record<string, unknown> = {};
+          if (needsCauses && data.causes && data.causes.length > 0) update.causes = data.causes;
+          if (needsSteps && data.fixSteps && data.fixSteps.length > 0) update.fixSteps = data.fixSteps;
+          if (Object.keys(update).length > 0) {
+            update.translations = {};
+            await prisma.faultCode.update({ where: { id: fc.id }, data: update });
+            totalEnriched++;
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.log(`  ❌ ${fc.code}: ${msg.substring(0, 80)}`);
+          totalFailed++;
+        }
       }
+      console.log(`  ✅ Done — Total: ${totalEnriched} enriched, ${totalFailed} failed`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.log(`  ❌ Batch failed: ${msg}`);
+      totalFailed += batch.length;
     }
+  }
 
-    console.log(`  📊 Progress: ${totalEnriched} enriched / ${totalFailed} failed / ${unenriched.length} total`);
+  // Process causes-only codes first (cheaper — no description sent, smaller prompt)
+  for (let i = 0; i < causesOnlyQueue.length; i += BATCH_SIZE) {
+    const batch = causesOnlyQueue.slice(i, i + BATCH_SIZE);
+    const manual = batch[0].manual;
+    await processBatch(batch, true, false, `${manual.brand.name}/${manual.name}`);
+  }
+
+  // Then process codes needing both
+  for (let i = 0; i < needsBothQueue.length; i += BATCH_SIZE) {
+    const batch = needsBothQueue.slice(i, i + BATCH_SIZE);
+    const manual = batch[0].manual;
+    await processBatch(batch, true, true, `${manual.brand.name}/${manual.name}`);
   }
 
   console.log("\n" + "━".repeat(50));
