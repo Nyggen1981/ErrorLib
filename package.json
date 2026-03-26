@@ -14,6 +14,7 @@
     "db:generate": "npx prisma generate",
     "db:seed": "npx tsx prisma/seed.ts",
     "generate:sitemap": "npx tsx scripts/generate-sitemap.ts",
+    "list-modules": "npx tsx scripts/list-modules.ts",
     "process-manual": "npx tsx scripts/process-manual.ts",
     "mine": "npx tsx scripts/auto-miner.ts",
     "push-google": "npx tsx scripts/push-to-google.ts"
