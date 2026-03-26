@@ -5,6 +5,7 @@ import { getLocale, getActiveLanguages } from "@/lib/locale";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { SearchBar } from "@/components/SearchBar";
 import { HreflangTags } from "@/components/HreflangTags";
+import { Footer } from "@/components/Footer";
 import "./globals.css";
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
@@ -109,20 +110,7 @@ export default async function RootLayout({
           </nav>
         </header>
         <main className="overflow-x-hidden">{children}</main>
-        <footer className="border-t border-technical-700 bg-technical-800">
-          <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
-            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-technical-300">
-              <span>{t("footerTitle", locale)}</span>
-              <span className="hidden text-technical-500 sm:inline">|</span>
-              <a href="/about" className="transition hover:text-accent">About</a>
-              <a href="/privacy" className="transition hover:text-accent">Privacy</a>
-              <a href="/terms" className="transition hover:text-accent">Terms</a>
-            </div>
-            <p className="mx-auto mt-2 max-w-3xl text-center text-[10px] leading-relaxed text-technical-400">
-              {t("disclaimer", locale)}
-            </p>
-          </div>
-        </footer>
+        <Footer locale={locale} />
       </body>
     </html>
   );
