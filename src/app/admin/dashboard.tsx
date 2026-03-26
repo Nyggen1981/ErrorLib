@@ -171,16 +171,89 @@ function RetryButton({ brand }: { brand: string }) {
   );
 }
 
+function MiningLogTable({ logs }: { logs: MiningLogEntry[] }) {
+  const succeededManuals = new Set(
+    logs
+      .filter((l) => l.status === "success")
+      .map((l) => `${l.brand}::${l.manual}`)
+  );
+
+  function showRetry(entry: MiningLogEntry): boolean {
+    if (entry.status !== "empty" && entry.status !== "aborted" && entry.status !== "failed") return false;
+    return !succeededManuals.has(`${entry.brand}::${entry.manual}`);
+  }
+
+  return (
+    <table className="w-full text-left text-sm">
+      <thead>
+        <tr className="border-b border-technical-700 text-technical-400">
+          <th className="pb-3 pr-4 font-medium">Status</th>
+          <th className="pb-3 pr-4 font-medium">Brand</th>
+          <th className="pb-3 pr-4 font-medium">Manual</th>
+          <th className="pb-3 pr-4 font-medium text-right">Codes</th>
+          <th className="pb-3 pr-4 font-medium text-right">Pages</th>
+          <th className="pb-3 pr-4 font-medium text-right">Duration</th>
+          <th className="pb-3 pr-4 font-medium">When</th>
+          <th className="pb-3 font-medium"></th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-technical-700/50">
+        {logs.map((entry) => (
+          <tr key={entry.id} className="text-technical-300">
+            <td className="py-3 pr-4">{statusBadge(entry.status)}</td>
+            <td className="py-3 pr-4 whitespace-nowrap font-medium text-technical-200">
+              {entry.brand}
+            </td>
+            <td className="py-3 pr-4 max-w-[220px] truncate text-technical-400">
+              {entry.manual}
+            </td>
+            <td className="py-3 pr-4 text-right tabular-nums">
+              <span
+                className={
+                  entry.codesFound > 0
+                    ? "text-accent font-semibold"
+                    : "text-technical-500"
+                }
+              >
+                {entry.codesFound}
+              </span>
+            </td>
+            <td className="py-3 pr-4 text-right tabular-nums text-technical-500">
+              {entry.pagesUsed}
+            </td>
+            <td className="py-3 pr-4 text-right tabular-nums text-technical-500">
+              {(entry.durationMs / 1000).toFixed(1)}s
+            </td>
+            <td className="py-3 pr-4 whitespace-nowrap text-technical-500">
+              {timeAgo(entry.createdAt)}
+            </td>
+            <td className="py-3">
+              {showRetry(entry) && <RetryButton brand={entry.brand} />}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function MassRetryButton({ logs }: { logs: MiningLogEntry[] }) {
+  const succeededManuals = new Set(
+    logs
+      .filter((l) => l.status === "success")
+      .map((l) => `${l.brand}::${l.manual}`)
+  );
+
   const failedBrands = [
     ...new Set(
       logs
         .filter(
           (l) =>
-            l.status === "empty" ||
-            l.status === "failed" ||
-            l.status === "aborted" ||
-            (l.codesFound === 0 && l.status !== "skipped")
+            (l.status === "empty" ||
+              l.status === "failed" ||
+              l.status === "aborted" ||
+              (l.codesFound === 0 && l.status !== "skipped")) &&
+            !succeededManuals.has(`${l.brand}::${l.manual}`)
         )
         .map((l) => l.brand)
     ),
@@ -1796,68 +1869,7 @@ export function AdminDashboard({
           </div>
           {miningLogs.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-technical-700 text-technical-400">
-                    <th className="pb-3 pr-4 font-medium">Status</th>
-                    <th className="pb-3 pr-4 font-medium">Brand</th>
-                    <th className="pb-3 pr-4 font-medium">Manual</th>
-                    <th className="pb-3 pr-4 font-medium text-right">
-                      Codes
-                    </th>
-                    <th className="pb-3 pr-4 font-medium text-right">
-                      Pages
-                    </th>
-                    <th className="pb-3 pr-4 font-medium text-right">
-                      Duration
-                    </th>
-                    <th className="pb-3 pr-4 font-medium">When</th>
-                    <th className="pb-3 font-medium"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-technical-700/50">
-                  {miningLogs.map((entry) => (
-                    <tr key={entry.id} className="text-technical-300">
-                      <td className="py-3 pr-4">
-                        {statusBadge(entry.status)}
-                      </td>
-                      <td className="py-3 pr-4 whitespace-nowrap font-medium text-technical-200">
-                        {entry.brand}
-                      </td>
-                      <td className="py-3 pr-4 max-w-[220px] truncate text-technical-400">
-                        {entry.manual}
-                      </td>
-                      <td className="py-3 pr-4 text-right tabular-nums">
-                        <span
-                          className={
-                            entry.codesFound > 0
-                              ? "text-accent font-semibold"
-                              : "text-technical-500"
-                          }
-                        >
-                          {entry.codesFound}
-                        </span>
-                      </td>
-                      <td className="py-3 pr-4 text-right tabular-nums text-technical-500">
-                        {entry.pagesUsed}
-                      </td>
-                      <td className="py-3 pr-4 text-right tabular-nums text-technical-500">
-                        {(entry.durationMs / 1000).toFixed(1)}s
-                      </td>
-                      <td className="py-3 pr-4 whitespace-nowrap text-technical-500">
-                        {timeAgo(entry.createdAt)}
-                      </td>
-                      <td className="py-3">
-                        {(entry.status === "empty" ||
-                          entry.status === "aborted" ||
-                          entry.status === "failed") && (
-                          <RetryButton brand={entry.brand} />
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <MiningLogTable logs={miningLogs} />
             </div>
           ) : (
             <p className="text-sm text-technical-500">
