@@ -11,6 +11,7 @@ const LANG_NAMES: Record<string, string> = {
 type TranslationResult = {
   description: string;
   fixSteps: string[];
+  causes?: string[];
   title: string;
 };
 
@@ -36,6 +37,7 @@ export async function getTranslatedFaultCode(
       title: true,
       description: true,
       fixSteps: true,
+      causes: true,
       translations: true,
     },
   });
@@ -43,7 +45,13 @@ export async function getTranslatedFaultCode(
   if (!fault) throw new TranslateError("not_found", "Fault code not found in DB");
 
   const existing = (fault.translations as TranslationsMap) ?? {};
-  if (existing[targetLang]) return existing[targetLang];
+  const cached = existing[targetLang];
+  if (cached) {
+    if (!cached.causes && fault.causes && fault.causes.length > 0) {
+      cached.causes = fault.causes;
+    }
+    return cached;
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new TranslateError("no_api_key", "GEMINI_API_KEY is not set");
@@ -54,14 +62,20 @@ export async function getTranslatedFaultCode(
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
+  const hasCauses = fault.causes && fault.causes.length > 0;
+  const causesBlock = hasCauses
+    ? `\nCauses:\n${fault.causes!.map((c, i) => `${i + 1}. ${c}`).join("\n")}`
+    : "";
+  const causesJson = hasCauses ? ', "causes": ["cause1", "cause2", ...]' : "";
+
   const prompt = `Translate the following industrial fault code information from English to ${langName}.
-Keep all technical terms, model numbers, and fault codes unchanged.
+Keep all technical terms, model numbers, parameter names, and fault codes unchanged.
 Return ONLY valid JSON with this exact structure:
-{"title": "...", "description": "...", "fixSteps": ["step1", "step2", ...]}
+{"title": "...", "description": "...", "fixSteps": ["step1", "step2", ...]${causesJson}}
 
 English content:
 Title: ${fault.title}
-Description: ${fault.description}
+Description: ${fault.description}${causesBlock}
 Fix Steps:
 ${fault.fixSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}`;
 
@@ -75,6 +89,10 @@ ${fault.fixSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}`;
 
   if (!parsed.title || !parsed.description || !Array.isArray(parsed.fixSteps)) {
     throw new TranslateError("invalid_json", "Gemini returned incomplete fields");
+  }
+
+  if (hasCauses && !Array.isArray(parsed.causes)) {
+    parsed.causes = fault.causes;
   }
 
   const updated: TranslationsMap = { ...existing, [targetLang]: parsed };

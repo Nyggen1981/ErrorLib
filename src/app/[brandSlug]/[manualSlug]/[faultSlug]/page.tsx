@@ -94,7 +94,10 @@ export default async function FaultCodePage({ params }: Props) {
   };
 
   const translations = (fault.translations as Record<string, typeof englishContent>) ?? {};
-  const cachedTranslation = locale !== "en" ? translations[locale] ?? null : null;
+  const rawCached = locale !== "en" ? translations[locale] ?? null : null;
+  const cachedTranslation = rawCached
+    ? { ...rawCached, causes: rawCached.causes ?? fault.causes }
+    : null;
 
   const brandName = fault.manual.brand.name;
   const pageUrl = `https://errorlib.net/${fault.manual.brand.slug}/${fault.manual.slug}/${fault.slug}`;
