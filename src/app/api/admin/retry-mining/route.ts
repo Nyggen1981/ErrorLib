@@ -31,24 +31,25 @@ async function getRetryableBrands(
     }
   }
 
-  // Brands that have already been force-retried via the queue count as exhausted
+  // Count force-retry queue entries per brand (any status — pending/processing/completed)
   const previousRetries = await prisma.miningQueue.findMany({
-    where: { targetManuals: { has: "__FORCE_RETRY__" }, status: "completed" },
+    where: { targetManuals: { has: "__FORCE_RETRY__" } },
     select: { brandName: true },
   });
-  const alreadyRetried = new Set(
-    previousRetries.map((q) => q.brandName.toLowerCase())
-  );
+  const brandQueueRetries = new Map<string, number>();
+  for (const q of previousRetries) {
+    const key = q.brandName.toLowerCase();
+    brandQueueRetries.set(key, (brandQueueRetries.get(key) || 0) + 1);
+  }
 
-  // A manual is retryable only if: no success, fewer than MAX_ATTEMPTS failures,
-  // AND the brand hasn't already been force-retried via the queue
+  // Effective attempts = log failures + queue-level force retries
   const retryableManuals = [...attemptCounts.entries()].filter(
     ([key, count]) => {
       const brand = key.split("::")[0];
+      const queueAttempts = brandQueueRetries.get(brand.toLowerCase()) || 0;
       return (
         !succeededManuals.has(key) &&
-        count < MAX_ATTEMPTS &&
-        !alreadyRetried.has(brand.toLowerCase())
+        count + queueAttempts < MAX_ATTEMPTS
       );
     }
   );
