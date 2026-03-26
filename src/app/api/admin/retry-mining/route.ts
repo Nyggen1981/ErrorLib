@@ -2,8 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 
+const MAX_ATTEMPTS = 2;
+
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
+
+function getRetryableBrands(
+  allLogs: { brand: string; manual: string; status: string; codesFound: number }[]
+) {
+  const succeededManuals = new Set(
+    allLogs
+      .filter((l) => l.status === "success")
+      .map((l) => `${l.brand}::${l.manual}`)
+  );
+
+  // Count how many times each manual has been attempted (failed/aborted/empty)
+  const attemptCounts = new Map<string, number>();
+  for (const l of allLogs) {
+    if (
+      l.status === "empty" ||
+      l.status === "failed" ||
+      l.status === "aborted" ||
+      (l.codesFound === 0 && l.status !== "skipped")
+    ) {
+      const key = `${l.brand}::${l.manual}`;
+      attemptCounts.set(key, (attemptCounts.get(key) || 0) + 1);
+    }
+  }
+
+  // A manual is retryable only if: no success AND fewer than MAX_ATTEMPTS failures
+  const retryableManuals = [...attemptCounts.entries()].filter(
+    ([key, count]) => !succeededManuals.has(key) && count < MAX_ATTEMPTS
+  );
+
+  return [...new Set(retryableManuals.map(([key]) => key.split("::")[0]))];
 }
 
 export async function GET() {
@@ -14,26 +47,7 @@ export async function GET() {
     select: { brand: true, manual: true, status: true, codesFound: true },
   });
 
-  const succeededManuals = new Set(
-    allLogs
-      .filter((l) => l.status === "success")
-      .map((l) => `${l.brand}::${l.manual}`)
-  );
-
-  const failedBrands = new Set(
-    allLogs
-      .filter(
-        (l) =>
-          (l.status === "empty" ||
-            l.status === "failed" ||
-            l.status === "aborted" ||
-            (l.codesFound === 0 && l.status !== "skipped")) &&
-          !succeededManuals.has(`${l.brand}::${l.manual}`)
-      )
-      .map((l) => l.brand)
-  );
-
-  const uniqueBrands = [...failedBrands];
+  const uniqueBrands = getRetryableBrands(allLogs);
 
   const alreadyQueued = await prisma.miningQueue.findMany({
     where: {
@@ -71,26 +85,7 @@ export async function POST(req: NextRequest) {
       select: { brand: true, manual: true, status: true, codesFound: true },
     });
 
-    const succeededManuals = new Set(
-      allLogs
-        .filter((l) => l.status === "success")
-        .map((l) => `${l.brand}::${l.manual}`)
-    );
-
-    const failedBrands = new Set(
-      allLogs
-        .filter(
-          (l) =>
-            (l.status === "empty" ||
-              l.status === "failed" ||
-              l.status === "aborted" ||
-              (l.codesFound === 0 && l.status !== "skipped")) &&
-            !succeededManuals.has(`${l.brand}::${l.manual}`)
-        )
-        .map((l) => l.brand)
-    );
-
-    const uniqueBrands = [...failedBrands];
+    const uniqueBrands = getRetryableBrands(allLogs);
 
     const alreadyQueued = await prisma.miningQueue.findMany({
       where: {
@@ -110,7 +105,7 @@ export async function POST(req: NextRequest) {
     if (toQueue.length === 0) {
       return NextResponse.json({
         queued: 0,
-        message: "All failed brands are already in the queue or already succeeded.",
+        message: "All failed brands are already in the queue, succeeded, or exhausted retries.",
       });
     }
 

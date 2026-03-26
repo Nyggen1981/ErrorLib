@@ -178,9 +178,19 @@ function MiningLogTable({ logs }: { logs: MiningLogEntry[] }) {
       .map((l) => `${l.brand}::${l.manual}`)
   );
 
+  const failCounts = new Map<string, number>();
+  for (const l of logs) {
+    if (l.status === "empty" || l.status === "aborted" || l.status === "failed") {
+      const key = `${l.brand}::${l.manual}`;
+      failCounts.set(key, (failCounts.get(key) || 0) + 1);
+    }
+  }
+
   function showRetry(entry: MiningLogEntry): boolean {
     if (entry.status !== "empty" && entry.status !== "aborted" && entry.status !== "failed") return false;
-    return !succeededManuals.has(`${entry.brand}::${entry.manual}`);
+    const key = `${entry.brand}::${entry.manual}`;
+    if (succeededManuals.has(key)) return false;
+    return (failCounts.get(key) || 0) < 2;
   }
 
   return (
