@@ -63,7 +63,9 @@ export async function upsertFaultCode(
   description: string,
   fixSteps: string[],
   sourceUrl?: string,
-  sourcePage?: number
+  sourcePage?: number,
+  causes?: string[],
+  requiredTools?: string[]
 ) {
   const prisma = getPrisma();
 
@@ -80,6 +82,8 @@ export async function upsertFaultCode(
         fixSteps,
         ...(sourceUrl && { sourceUrl }),
         ...(sourcePage != null && { sourcePage }),
+        ...(causes && causes.length > 0 && { causes }),
+        ...(requiredTools && requiredTools.length > 0 && { requiredTools }),
       },
     });
   }
@@ -100,6 +104,8 @@ export async function upsertFaultCode(
           manualId,
           sourceUrl,
           sourcePage,
+          ...(causes && causes.length > 0 && { causes }),
+          ...(requiredTools && requiredTools.length > 0 && { requiredTools }),
         },
       });
     } catch (err) {
@@ -112,6 +118,38 @@ export async function upsertFaultCode(
       throw err;
     }
   }
+}
+
+export async function enrichFaultCode(
+  manualId: string,
+  code: string,
+  data: {
+    causes?: string[];
+    requiredTools?: string[];
+    fixSteps?: string[];
+    description?: string;
+    sourcePage?: number;
+  }
+): Promise<boolean> {
+  const prisma = getPrisma();
+  const existing = await prisma.faultCode.findFirst({
+    where: { code, manualId },
+  });
+  if (!existing) return false;
+
+  const update: Record<string, unknown> = {};
+  if (data.causes && data.causes.length > 0) update.causes = data.causes;
+  if (data.requiredTools && data.requiredTools.length > 0) update.requiredTools = data.requiredTools;
+  if (data.fixSteps && data.fixSteps.length > 0) update.fixSteps = data.fixSteps;
+  if (data.description && data.description.length > existing.description.length) update.description = data.description;
+  if (data.sourcePage != null && !existing.sourcePage) update.sourcePage = data.sourcePage;
+
+  if (Object.keys(update).length === 0) return false;
+
+  update.translations = {};
+
+  await prisma.faultCode.update({ where: { id: existing.id }, data: update });
+  return true;
 }
 
 // ─── Mining Log ───
@@ -146,6 +184,8 @@ type QueueItem = {
   fixSteps: string[];
   sourceUrl?: string;
   sourcePage?: number;
+  causes?: string[];
+  requiredTools?: string[];
 };
 
 let _queue: QueueItem[] = [];
@@ -172,7 +212,9 @@ export async function flushDbQueue(): Promise<number> {
           item.description,
           item.fixSteps,
           item.sourceUrl,
-          item.sourcePage
+          item.sourcePage,
+          item.causes,
+          item.requiredTools
         );
         saved++;
       } catch (err) {

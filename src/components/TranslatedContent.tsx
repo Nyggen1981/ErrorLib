@@ -6,6 +6,8 @@ type Translation = {
   title: string;
   description: string;
   fixSteps: string[];
+  causes?: string[];
+  requiredTools?: string[];
 };
 
 type ContextValue = {

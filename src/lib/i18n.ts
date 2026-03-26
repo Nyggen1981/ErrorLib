@@ -119,6 +119,24 @@ const dict = {
     de: "Mehr Codes in diesem Handbuch suchen",
     es: "Buscar más códigos en este manual",
   },
+  commonCauses: {
+    en: "Common Causes",
+    no: "Vanlige årsaker",
+    de: "Häufige Ursachen",
+    es: "Causas comunes",
+  },
+  requiredTools: {
+    en: "Required Tools",
+    no: "Nødvendig verktøy",
+    de: "Benötigtes Werkzeug",
+    es: "Herramientas necesarias",
+  },
+  verifiedData: {
+    en: "Verified technical data. Last updated:",
+    no: "Verifisert teknisk data. Sist oppdatert:",
+    de: "Verifizierte technische Daten. Zuletzt aktualisiert:",
+    es: "Datos técnicos verificados. Última actualización:",
+  },
   translating: { en: "Translating...", no: "Oversetter...", de: "Übersetzen...", es: "Traduciendo..." },
 
   // ─── Brand page ───

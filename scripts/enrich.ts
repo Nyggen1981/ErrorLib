@@ -1,0 +1,214 @@
+import "dotenv/config";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { PrismaClient } from "../generated/prisma/client.js";
+import { PrismaNeon } from "@prisma/adapter-neon";
+
+const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! });
+const prisma = new PrismaClient({ adapter });
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+
+const ENRICH_PROMPT = `You are given a list of industrial fault codes that already exist in our database. Your job is to ENRICH each one with additional structured data.
+
+For each fault code provided, return:
+- "code": The exact code string (must match input exactly)
+- "causes": Array of 3-5 strings explaining WHY this fault typically occurs. Be specific to industrial automation equipment. Examples: "Motor cable insulation breakdown due to aging or mechanical damage", "Supply voltage sag below 340V during heavy load transients", "Encoder feedback cable shielding fault causing signal noise".
+- "requiredTools": Array of 1-4 tools a technician needs. Examples: "Multimeter (AC/DC voltage + resistance)", "Megohmmeter 500VDC", "Laptop with manufacturer software", "Oscilloscope for signal analysis". Only list tools relevant to diagnosing this specific fault.
+- "fixSteps": Array of 3-6 detailed, numbered repair steps. Every step MUST reference a specific measurement, parameter, terminal, or verifiable action. BANNED: "check wiring", "consult manual", "replace if necessary", "ensure proper ventilation".
+
+If you cannot produce specific causes/tools for a code, return shorter arrays rather than padding with generic content.
+
+Return ONLY valid JSON. No markdown fences, no commentary.
+Output: { "codes": [{ "code": "...", "causes": ["..."], "requiredTools": ["..."], "fixSteps": ["..."] }] }`;
+
+const BATCH_SIZE = 15;
+const RATE_GAP_MS = 35_000;
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function callGemini(
+  codesContext: { code: string; title: string; description: string }[],
+  maxRetries = 3
+): Promise<{ code: string; causes: string[]; requiredTools: string[]; fixSteps: string[] }[]> {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  const codeList = codesContext
+    .map((c) => `- ${c.code}: "${c.title}" — ${c.description.substring(0, 200)}`)
+    .join("\n");
+
+  const prompt = `${ENRICH_PROMPT}\n\nFault codes to enrich:\n${codeList}`;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await model.generateContent(prompt);
+      const raw = result.response.text().trim();
+      const cleaned = raw.replace(/^```json?\s*/i, "").replace(/```\s*$/i, "").trim();
+      const parsed = JSON.parse(cleaned);
+      return parsed.codes || [];
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const retryable =
+        msg.includes("429") || msg.includes("503") ||
+        msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED") ||
+        msg.includes("UNAVAILABLE") || msg.includes("overloaded");
+
+      if (retryable && attempt < maxRetries) {
+        const wait = 30 * (attempt + 1);
+        console.log(`  ⏳ ${msg.substring(0, 60)}... retrying in ${wait}s (${attempt + 1}/${maxRetries})`);
+        await sleep(wait * 1000);
+        continue;
+      }
+      throw err;
+    }
+  }
+  return [];
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const brandFilter = args.find((a) => a.startsWith("--brand="))?.split("=")[1];
+  const manualFilter = args.find((a) => a.startsWith("--manual="))?.split("=")[1];
+  const dryRun = args.includes("--dry");
+
+  console.log("🔧 ErrorLib Enrichment Script");
+  console.log("━".repeat(50));
+
+  const where: Record<string, unknown> = {
+    OR: [
+      { causes: { isEmpty: true } },
+      { requiredTools: { isEmpty: true } },
+    ],
+  };
+
+  if (brandFilter) {
+    const brand = await prisma.brand.findFirst({
+      where: { slug: { contains: brandFilter, mode: "insensitive" } },
+    });
+    if (!brand) {
+      console.error(`❌ Brand "${brandFilter}" not found`);
+      process.exit(1);
+    }
+    console.log(`📌 Filtering to brand: ${brand.name}`);
+    where.manual = { brandId: brand.id };
+  }
+
+  if (manualFilter) {
+    where.manual = {
+      ...(where.manual as object || {}),
+      slug: { contains: manualFilter, mode: "insensitive" },
+    };
+  }
+
+  const unenriched = await prisma.faultCode.findMany({
+    where,
+    include: { manual: { include: { brand: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+
+  console.log(`📊 Found ${unenriched.length} fault codes needing enrichment`);
+  if (unenriched.length === 0) {
+    console.log("✅ All codes are already enriched!");
+    return;
+  }
+
+  const manualGroups = new Map<string, typeof unenriched>();
+  for (const fc of unenriched) {
+    const key = fc.manualId;
+    if (!manualGroups.has(key)) manualGroups.set(key, []);
+    manualGroups.get(key)!.push(fc);
+  }
+
+  console.log(`📦 Spread across ${manualGroups.size} manuals\n`);
+
+  let totalEnriched = 0;
+  let totalFailed = 0;
+  let manualIdx = 0;
+
+  for (const [manualId, codes] of manualGroups) {
+    manualIdx++;
+    const manual = codes[0].manual;
+    const label = `${manual.brand.name} / ${manual.name}`;
+    console.log(`\n[${manualIdx}/${manualGroups.size}] 📖 ${label} (${codes.length} codes)`);
+
+    for (let batchStart = 0; batchStart < codes.length; batchStart += BATCH_SIZE) {
+      const batch = codes.slice(batchStart, batchStart + BATCH_SIZE);
+      const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(codes.length / BATCH_SIZE);
+
+      if (batchStart > 0) {
+        console.log(`  ⏳ Rate-limit gap (${RATE_GAP_MS / 1000}s)...`);
+        await sleep(RATE_GAP_MS);
+      }
+
+      console.log(`  Batch ${batchNum}/${totalBatches}: enriching ${batch.length} codes...`);
+
+      try {
+        const enriched = await callGemini(
+          batch.map((fc) => ({
+            code: fc.code,
+            title: fc.title,
+            description: fc.description,
+          }))
+        );
+
+        const enrichMap = new Map(enriched.map((e) => [e.code.toLowerCase(), e]));
+
+        for (const fc of batch) {
+          const data = enrichMap.get(fc.code.toLowerCase());
+          if (!data) {
+            totalFailed++;
+            continue;
+          }
+
+          if (dryRun) {
+            console.log(`    [DRY] ${fc.code}: ${data.causes?.length || 0} causes, ${data.requiredTools?.length || 0} tools, ${data.fixSteps?.length || 0} steps`);
+            totalEnriched++;
+            continue;
+          }
+
+          try {
+            const update: Record<string, unknown> = {};
+            if (data.causes?.length > 0) update.causes = data.causes;
+            if (data.requiredTools?.length > 0) update.requiredTools = data.requiredTools;
+            if (data.fixSteps?.length > 0) update.fixSteps = data.fixSteps;
+            if (Object.keys(update).length > 0) {
+              update.translations = {};
+              await prisma.faultCode.update({
+                where: { id: fc.id },
+                data: update,
+              });
+              totalEnriched++;
+            }
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.log(`    ❌ ${fc.code}: ${msg.substring(0, 80)}`);
+            totalFailed++;
+          }
+        }
+
+        console.log(`  ✅ Batch ${batchNum} done — Enriched: ${totalEnriched}, Failed: ${totalFailed}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.log(`  ❌ Batch ${batchNum} failed: ${msg.substring(0, 120)}`);
+        totalFailed += batch.length;
+      }
+    }
+
+    console.log(`  📊 Progress: ${totalEnriched} enriched / ${totalFailed} failed / ${unenriched.length} total`);
+  }
+
+  console.log("\n" + "━".repeat(50));
+  console.log(`🏁 ENRICHMENT COMPLETE`);
+  console.log(`   Successfully enriched: ${totalEnriched}`);
+  console.log(`   Failed: ${totalFailed}`);
+  console.log(`   Total processed: ${unenriched.length}`);
+}
+
+main()
+  .catch((err) => {
+    console.error("Fatal error:", err);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());

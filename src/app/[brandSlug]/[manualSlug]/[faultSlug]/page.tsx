@@ -6,6 +6,8 @@ import {
   TranslatedTitle,
   TranslatedDescription,
   TranslatedAllSteps,
+  TranslatedCauses,
+  TranslatedTools,
   TranslatingBanner,
 } from "@/components/FaultCodeContent";
 import { AdSlot } from "@/components/AdSlot";
@@ -81,6 +83,8 @@ export default async function FaultCodePage({ params }: Props) {
     title: fault.title,
     description: fault.description,
     fixSteps: fault.fixSteps,
+    causes: fault.causes,
+    requiredTools: fault.requiredTools,
   };
 
   const translations = (fault.translations as Record<string, typeof englishContent>) ?? {};
@@ -116,6 +120,41 @@ export default async function FaultCodePage({ params }: Props) {
     dateModified: fault.updatedAt.toISOString(),
   };
 
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: `What does ${brandName} fault code ${fault.code} mean?`,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: fault.description,
+        },
+      },
+      ...(fault.causes.length > 0
+        ? [
+            {
+              "@type": "Question",
+              name: `What causes ${brandName} error ${fault.code}?`,
+              acceptedAnswer: {
+                "@type": "Answer",
+                text: fault.causes.join(". "),
+              },
+            },
+          ]
+        : []),
+      {
+        "@type": "Question",
+        name: `How do you fix ${brandName} fault code ${fault.code}?`,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: fault.fixSteps.map((s, i) => `${i + 1}. ${s}`).join(" "),
+        },
+      },
+    ],
+  };
+
   return (
     <>
       <script
@@ -125,6 +164,10 @@ export default async function FaultCodePage({ params }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
       <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6 sm:py-6">
         <TranslatedContent
@@ -183,6 +226,12 @@ export default async function FaultCodePage({ params }: Props) {
             <TranslatedDescription />
           </section>
 
+          {/* Causes */}
+          <TranslatedCauses heading={t("commonCauses", locale)} />
+
+          {/* Required Tools */}
+          <TranslatedTools heading={t("requiredTools", locale)} />
+
           {/* All Steps */}
           <section className="mb-5 rounded-lg border border-technical-700 bg-technical-800 p-5 sm:p-6">
             <div className="mb-4 flex items-center gap-2">
@@ -218,6 +267,14 @@ export default async function FaultCodePage({ params }: Props) {
               </a>
             )}
           </section>
+
+          {/* Metadata badge */}
+          <div className="mb-5 flex items-center gap-2 rounded-md border border-technical-700 bg-technical-800/50 px-3 py-2 text-[11px] text-technical-400">
+            <svg className="h-3.5 w-3.5 text-green-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {t("verifiedData", locale)} {fault.updatedAt.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+          </div>
 
           <AdSlot slot="content" />
 

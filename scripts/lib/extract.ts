@@ -9,6 +9,8 @@ export type ExtractedCode = {
   code: string;
   title: string;
   description: string;
+  causes: string[];
+  requiredTools: string[];
   fixSteps: string[];
   sourcePage?: number;
 };
@@ -54,6 +56,8 @@ For each code, return:
 - "code": Exact alphanumeric fault code as printed (e.g. F0001, A0502, E016, 2310, FL1)
 - "title": Short human-readable title (e.g. "Overcurrent", "DC Bus Overvoltage")
 - "description": 2-4 sentences explaining the root cause, affected component, and risk. Include specific technical details: parameter numbers (e.g. "Parameter 99.06"), terminal names (e.g. "DI1", "X1:3"), and threshold values (e.g. "voltage >415V") when available in the source text.
+- "causes": Array of 3-5 strings explaining WHY this fault typically occurs (e.g. "Motor cable insulation breakdown due to aging or mechanical damage", "Supply voltage sag below 340V during heavy load transients"). Be specific to this equipment, not generic.
+- "requiredTools": Array of 1-4 tools/equipment a technician needs to diagnose and fix this fault (e.g. "Multimeter (AC/DC voltage + resistance)", "Megohmmeter 500VDC", "Laptop with DriveComposer/STARTER software", "10mm combination wrench"). Only list tools actually relevant to the fixSteps.
 - "fixSteps": Array of 3-6 specific troubleshooting steps ordered by priority.
 - "sourcePage": The PDF page number where this fault code is primarily documented. Use the page number shown in the "--- Page X ---" header.
 
@@ -80,7 +84,7 @@ Strict filtering:
 - If no fault codes exist in the text, return: { "codes": [] }
 - Return ONLY valid JSON. No markdown fences, no commentary.
 
-Output: { "codes": [{ "code": "...", "title": "...", "description": "...", "fixSteps": ["..."], "sourcePage": N }] }`;
+Output: { "codes": [{ "code": "...", "title": "...", "description": "...", "causes": ["..."], "requiredTools": ["..."], "fixSteps": ["..."], "sourcePage": N }] }`;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -339,6 +343,8 @@ export async function extractWithOcr(
         title: fc.title,
         description: fc.description || `Fault ${fc.code}`,
         fixSteps: (fc.fixSteps || []).slice(0, 6),
+        causes: fc.causes || [],
+        requiredTools: fc.requiredTools || [],
         sourceUrl,
         sourcePage: fc.sourcePage,
       });
@@ -445,6 +451,8 @@ export async function extractAndSave(
       title: fc.title,
       description: fc.description || `Fault ${fc.code}`,
       fixSteps: (fc.fixSteps || []).slice(0, 6),
+      causes: fc.causes || [],
+      requiredTools: fc.requiredTools || [],
       sourceUrl,
       sourcePage: fc.sourcePage,
     });
