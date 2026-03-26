@@ -106,46 +106,49 @@ export function extractManualNameFallback(title: string, brand: string): string 
 export async function extractManualName(
   title: string,
   url: string,
-  brand: string
+  brand: string,
+  existingNames?: string[]
 ): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return extractManualNameFallback(title, brand);
+
+  const existingBlock =
+    existingNames && existingNames.length > 0
+      ? `\nEXISTING MANUALS for ${brand} (use one of these if the new manual covers the same product series — return the EXACT existing string with only a different descriptor suffix if needed):\n${existingNames.map((n) => `  - "${n}"`).join("\n")}\n`
+      : "";
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const result = await model.generateContent(
-      `You are naming an industrial equipment manual for a database entry. Your goal is to identify the PRIMARY MODEL NAME the manual covers.
+      `You are an industrial equipment librarian cataloguing manuals into a database. Your goal is to identify the PRIMARY MODEL NAME the manual covers, and ensure consistency with existing entries.
 
 Given this PDF search result:
 - Brand: ${brand}
 - Search title: "${title}"
 - URL: ${url}
-
-RULES (strictly follow):
-1. Return the brand name followed by the primary product model/series name.
-2. NEVER use a part number as the model name (e.g. "A20B-2101-0390", "6SL3210-1PE21", "E84AVSCx" are part numbers — find the actual product name they belong to).
-3. NEVER use a document type as the name (e.g. "Service Bulletin", "Parameter List", "Maintenance Manual", "Connection Guide").
-4. NEVER use generic terms (e.g. "Connection", "Guide", "Manual", "System", "Diagnostics", "Error Codes").
-5. If the URL or title contains a clear model series (e.g. "ACS880", "Series 30i", "VLT Micro Drive FC 51", "SINAMICS G120"), USE IT.
-6. Add a short descriptor only if it clarifies the product type (e.g. "Standard Firmware", "Servo Amplifier", "AC Servo Motor").
-7. Maximum 60 characters.
+${existingBlock}
+RULES (strictly follow in this order):
+1. FIRST CHECK: If this manual covers the same product series as an existing entry, you MUST reuse that model name. Add a different descriptor suffix to distinguish it (e.g., if "ABB ACS880 Standard Firmware" exists and this is the hardware manual, return "ABB ACS880 Hardware Manual"). Near-matches count — "ACS880" and "ACS 880" are the same product.
+2. Return the brand name followed by the primary product model/series name.
+3. NEVER use a part number as the model name (e.g. "A20B-2101-0390", "6SL3210-1PE21", "E84AVSCx" are part numbers — find the actual product name they belong to).
+4. NEVER use a document type as the ONLY name (e.g. "Service Bulletin", "Parameter List", "Maintenance Manual").
+5. NEVER use generic terms alone (e.g. "Connection", "Guide", "Manual", "System", "Diagnostics").
+6. If the URL or title contains a clear model series (e.g. "ACS880", "Series 30i", "VLT Micro Drive FC 51", "SINAMICS G120"), USE IT.
+7. Add a short descriptor only if it clarifies the product type (e.g. "Standard Firmware", "Servo Amplifier", "AC Servo Motor").
+8. Maximum 60 characters.
 
 Good examples:
 - "${brand} ACS580 General Purpose Drive"
 - "${brand} Series 30i CNC Controller"
 - "${brand} VLT Micro Drive FC 51"
-- "${brand} SINAMICS G120 Variable Speed Drive"
 - "${brand} R-30iB Robot Controller"
-- "${brand} FR-E500 Inverter"
 
 Bad examples (NEVER return these):
 - "${brand} A20B-2101-0390" (part number)
 - "${brand} Connection" (generic)
 - "${brand} Manual Guide" (document type)
-- "${brand} Service Bulletin" (document type)
-- "${brand} E84AVSCx" (part number, not product name)
 
 Return ONLY the name, nothing else.`
     );

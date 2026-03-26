@@ -438,8 +438,15 @@ async function mine(
   const brandRecord = await upsertBrand(brand);
   let grandTotal = 0;
 
+  // Fetch existing manual names for consistency
+  const existingManuals = await getPrisma().manual.findMany({
+    where: { brandId: brandRecord.id },
+    select: { name: true },
+  });
+  const existingNames = existingManuals.map((m) => m.name);
+
   for (const pdf of textPdfs) {
-    const manualName = await extractManualName(pdf.title, pdf.url, brand);
+    const manualName = await extractManualName(pdf.title, pdf.url, brand, existingNames);
     log.info(`Processing manual: ${manualName} (${pdf.pages.length} pages)`);
 
     const manual = await upsertManual(brandRecord.id, manualName, pdf.url);
@@ -510,7 +517,7 @@ async function mine(
 
     for (const dl of ocrCandidates) {
       const fn = path.basename(dl.pdfPath);
-      const manualName = await extractManualName(dl.title, dl.url, brand);
+      const manualName = await extractManualName(dl.title, dl.url, brand, existingNames);
       log.info(`[OCR] Processing: ${manualName}`);
 
       const manual = await upsertManual(brandRecord.id, manualName, dl.url);
