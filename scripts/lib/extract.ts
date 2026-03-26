@@ -31,10 +31,40 @@ function getGemini(): GoogleGenerativeAI {
   return _genAI;
 }
 
+/** Scope gate for all fault-code extraction (text + PDF) in the miner */
+const INDUSTRIAL_SCOPE_SYSTEM_INSTRUCTION = `You must ONLY process manuals that belong to industrial automation, electrical engineering, energy systems, or mechanical / machine engineering — for example PLCs, VFDs/servo drives, industrial robots, CNC controls, process automation, industrial HMIs, fieldbuses, industrial switchgear, and similar equipment used in plants, factories, utilities, or machine building.
+
+If the document is clearly consumer electronics or unrelated consumer products — including but not limited to blood pressure monitors, domestic coffee machines, toys, home appliances, consumer audio/video, fitness wearables, or general household gadgets — you must NOT extract any fault codes. In that case respond with exactly this JSON and nothing else:
+{"codes":[]}
+
+No markdown fences, no commentary, no other keys.`;
+
+function getExtractionModel() {
+  return getGemini().getGenerativeModel({
+    model: "gemini-2.5-flash",
+    systemInstruction: INDUSTRIAL_SCOPE_SYSTEM_INSTRUCTION,
+  });
+}
+
+function parseExtractionResponse(raw: string): ExtractionResult {
+  const cleaned = raw
+    .replace(/^```json?\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+  try {
+    const parsed = JSON.parse(cleaned) as unknown;
+    if (parsed && typeof parsed === "object" && Array.isArray((parsed as ExtractionResult).codes)) {
+      return { codes: (parsed as ExtractionResult).codes };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { codes: [] };
+}
+
 export async function preflight(): Promise<boolean> {
   try {
-    const genAI = getGemini();
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = getGemini().getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent("Reply with only the word OK");
     const text = result.response.text().trim();
     return text.length > 0;
@@ -106,8 +136,7 @@ async function callGeminiText(
   pagesText: string,
   maxRetries = 5
 ): Promise<ExtractionResult> {
-  const genAI = getGemini();
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = getExtractionModel();
 
   const prompt = `${BATCH_PROMPT}\n\n--- MANUAL TEXT START ---\n${pagesText}\n--- MANUAL TEXT END ---`;
 
@@ -115,11 +144,7 @@ async function callGeminiText(
     try {
       const result = await model.generateContent(prompt);
       const raw = result.response.text().trim();
-      const cleaned = raw
-        .replace(/^```json?\s*/i, "")
-        .replace(/```\s*$/i, "")
-        .trim();
-      return JSON.parse(cleaned) as ExtractionResult;
+      return parseExtractionResponse(raw);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
 
@@ -203,8 +228,7 @@ async function callGeminiPdf(
   pdfBase64: string,
   maxRetries = 3
 ): Promise<ExtractionResult> {
-  const genAI = getGemini();
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = getExtractionModel();
 
   const parts = [
     {
@@ -222,11 +246,7 @@ async function callGeminiPdf(
     try {
       const result = await model.generateContent(parts);
       const raw = result.response.text().trim();
-      const cleaned = raw
-        .replace(/^```json?\s*/i, "")
-        .replace(/```\s*$/i, "")
-        .trim();
-      return JSON.parse(cleaned) as ExtractionResult;
+      return parseExtractionResponse(raw);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const isRetryable =

@@ -1,6 +1,18 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { log } from "./logger.js";
 
+/** Gemini returns this exact string when the hit is consumer / non-industrial */
+export const CONSUMER_MANUAL_SKIP = "CONSUMER_ELECTRONICS_SKIP";
+
+export function isConsumerSkipManualName(name: string): boolean {
+  return name.trim().toUpperCase() === CONSUMER_MANUAL_SKIP;
+}
+
+const MANUAL_NAME_SYSTEM_INSTRUCTION = `You help catalogue industrial equipment manuals only (automation, drives, PLCs, robots, CNC, process control, industrial power, machine tools).
+
+If the search result is clearly a consumer product unrelated to industrial plant or machine engineering — e.g. home blood pressure monitors, domestic coffee machines, toys, household appliances, consumer gadgets — respond with exactly this single line and nothing else:
+${CONSUMER_MANUAL_SKIP}`;
+
 export type SearchResult = {
   title: string;
   link: string;
@@ -119,7 +131,10 @@ export async function extractManualName(
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction: MANUAL_NAME_SYSTEM_INSTRUCTION,
+    });
 
     const result = await model.generateContent(
       `You are an industrial equipment librarian cataloguing manuals into a database. Your goal is to identify the PRIMARY MODEL NAME the manual covers, and ensure consistency with existing entries.
@@ -129,7 +144,9 @@ Given this PDF search result:
 - Search title: "${title}"
 - URL: ${url}
 ${existingBlock}
-RULES (strictly follow in this order):
+FIRST: If this result is consumer electronics or a non-industrial consumer product (not plant/factory/machine equipment), respond with exactly: ${CONSUMER_MANUAL_SKIP}
+
+Otherwise follow RULES (strictly in this order):
 1. FIRST CHECK: If this manual covers the same product series as an existing entry, you MUST reuse that model name. Add a different descriptor suffix to distinguish it (e.g., if "ABB ACS880 Standard Firmware" exists and this is the hardware manual, return "ABB ACS880 Hardware Manual"). Near-matches count — "ACS880" and "ACS 880" are the same product.
 2. Return the brand name followed by the primary product model/series name.
 3. NEVER use a part number as the model name (e.g. "A20B-2101-0390", "6SL3210-1PE21", "E84AVSCx" are part numbers — find the actual product name they belong to).
@@ -154,6 +171,9 @@ Return ONLY the name, nothing else.`
     );
 
     const cleaned = result.response.text().trim().replace(/["']/g, "");
+    if (isConsumerSkipManualName(cleaned)) {
+      return CONSUMER_MANUAL_SKIP;
+    }
     if (cleaned.length > 3 && cleaned.length < 80) {
       return cleaned;
     }

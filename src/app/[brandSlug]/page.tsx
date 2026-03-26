@@ -8,6 +8,7 @@ import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
 import type { Locale } from "@/lib/i18n";
 import type { Metadata } from "next";
+import { mergeSimilarSeriesGroups } from "@/lib/mergeSimilarSeries";
 
 type Props = {
   params: Promise<{ brandSlug: string }>;
@@ -254,7 +255,10 @@ export default async function BrandPage({ params, searchParams }: Props) {
 
   if (!brand) notFound();
 
-  const groups = groupManuals(brand.manuals, brand.name);
+  const groups = mergeSimilarSeriesGroups(
+    groupManuals(brand.manuals, brand.name),
+    0.8
+  );
   const totalCodes = groups.reduce((s, g) => s + g.totalCodes, 0);
 
   // ── Series Fault-Code List ──

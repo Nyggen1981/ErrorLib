@@ -1,7 +1,11 @@
 import "dotenv/config";
 import path from "path";
 import { log } from "./lib/logger.js";
-import { searchManuals, extractManualName } from "./lib/search.js";
+import {
+  searchManuals,
+  extractManualName,
+  isConsumerSkipManualName,
+} from "./lib/search.js";
 import { downloadPdf, ensureTempDir } from "./lib/download.js";
 import { extractDiagnosticText } from "./lib/pdf-parser.js";
 import { extractAndSave, extractWithOcr, preflight } from "./lib/extract.js";
@@ -447,6 +451,13 @@ async function mine(
 
   for (const pdf of textPdfs) {
     const manualName = await extractManualName(pdf.title, pdf.url, brand, existingNames);
+    if (isConsumerSkipManualName(manualName)) {
+      log.warn(
+        `  Skipping out-of-scope (consumer / non-industrial) manual: ${pdf.title}`
+      );
+      savings.skippedNoRelevance++;
+      continue;
+    }
     log.info(`Processing manual: ${manualName} (${pdf.pages.length} pages)`);
 
     const manual = await upsertManual(brandRecord.id, manualName, pdf.url);
@@ -518,6 +529,13 @@ async function mine(
     for (const dl of ocrCandidates) {
       const fn = path.basename(dl.pdfPath);
       const manualName = await extractManualName(dl.title, dl.url, brand, existingNames);
+      if (isConsumerSkipManualName(manualName)) {
+        log.warn(
+          `  [OCR] Skipping out-of-scope (consumer / non-industrial): ${dl.title}`
+        );
+        savings.skippedNoRelevance++;
+        continue;
+      }
       log.info(`[OCR] Processing: ${manualName}`);
 
       const manual = await upsertManual(brandRecord.id, manualName, dl.url);
