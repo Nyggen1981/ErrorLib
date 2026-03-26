@@ -8,10 +8,12 @@ const prisma = new PrismaClient({ adapter });
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-const ENRICH_PROMPT = `You are given a list of industrial fault codes that already exist in our database. Your job is to ENRICH each one with additional structured data.
+const ENRICH_PROMPT = `You are given a list of industrial fault codes that already exist in our database. Each entry has a numeric "ref" identifier. Your job is to ENRICH each one with additional structured data.
+
+CRITICAL: You MUST return the "ref" number EXACTLY as provided for each entry. This is how we match your output back to our database. Do NOT omit, rename, or change the ref values.
 
 For each fault code provided, return:
-- "code": The exact code string (must match input exactly)
+- "ref": The numeric reference ID (MUST match the input ref exactly — this is mandatory)
 - "causes": Array of 3-5 strings explaining WHY this fault typically occurs. Be specific to industrial automation equipment. Examples: "Motor cable insulation breakdown due to aging or mechanical damage", "Supply voltage sag below 340V during heavy load transients", "Encoder feedback cable shielding fault causing signal noise".
 - "requiredTools": Array of 1-4 tools a technician needs. Examples: "Multimeter (AC/DC voltage + resistance)", "Megohmmeter 500VDC", "Laptop with manufacturer software", "Oscilloscope for signal analysis". Only list tools relevant to diagnosing this specific fault.
 - "fixSteps": Array of 3-6 detailed, numbered repair steps. Every step MUST reference a specific measurement, parameter, terminal, or verifiable action. BANNED: "check wiring", "consult manual", "replace if necessary", "ensure proper ventilation".
@@ -19,7 +21,7 @@ For each fault code provided, return:
 If you cannot produce specific causes/tools for a code, return shorter arrays rather than padding with generic content.
 
 Return ONLY valid JSON. No markdown fences, no commentary.
-Output: { "codes": [{ "code": "...", "causes": ["..."], "requiredTools": ["..."], "fixSteps": ["..."] }] }`;
+Output: { "codes": [{ "ref": 1, "causes": ["..."], "requiredTools": ["..."], "fixSteps": ["..."] }] }`;
 
 const BATCH_SIZE = 15;
 const RATE_GAP_MS = 35_000;
@@ -28,14 +30,17 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+type EnrichInput = { ref: number; code: string; title: string; description: string };
+type EnrichOutput = { ref: number; causes: string[]; requiredTools: string[]; fixSteps: string[] };
+
 async function callGemini(
-  codesContext: { code: string; title: string; description: string }[],
+  codesContext: EnrichInput[],
   maxRetries = 3
-): Promise<{ code: string; causes: string[]; requiredTools: string[]; fixSteps: string[] }[]> {
+): Promise<EnrichOutput[]> {
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const codeList = codesContext
-    .map((c) => `- ${c.code}: "${c.title}" — ${c.description.substring(0, 200)}`)
+    .map((c) => `- ref=${c.ref}: Code "${c.code}", Title "${c.title}" — ${c.description.substring(0, 200)}`)
     .join("\n");
 
   const prompt = `${ENRICH_PROMPT}\n\nFault codes to enrich:\n${codeList}`;
@@ -46,7 +51,12 @@ async function callGemini(
       const raw = result.response.text().trim();
       const cleaned = raw.replace(/^```json?\s*/i, "").replace(/```\s*$/i, "").trim();
       const parsed = JSON.parse(cleaned);
-      return parsed.codes || [];
+      return (parsed.codes || []).map((c: Record<string, unknown>) => ({
+        ref: Number(c.ref),
+        causes: c.causes || [],
+        requiredTools: c.requiredTools || [],
+        fixSteps: c.fixSteps || [],
+      }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const retryable =
@@ -152,17 +162,20 @@ async function main() {
 
       try {
         const enriched = await callGemini(
-          batch.map((fc) => ({
+          batch.map((fc, i) => ({
+            ref: batchStart + i,
             code: fc.code,
             title: fc.title,
             description: fc.description,
           }))
         );
 
-        const enrichMap = new Map(enriched.map((e) => [e.code.toLowerCase(), e]));
+        const enrichMap = new Map(enriched.map((e) => [e.ref, e]));
 
-        for (const fc of batch) {
-          const data = enrichMap.get(fc.code.toLowerCase());
+        for (let i = 0; i < batch.length; i++) {
+          const fc = batch[i];
+          const ref = batchStart + i;
+          const data = enrichMap.get(ref);
           if (!data) {
             totalFailed++;
             continue;
