@@ -3,6 +3,7 @@
  * fold generic buckets, then (in the app) mergeSimilarSeriesGroups is applied on top.
  */
 
+import { washManualTitle } from "@/lib/manual-title-wash";
 import { mergeSimilarSeriesGroups } from "./mergeSimilarSeries";
 
 export type ManualWithCount = {
@@ -50,6 +51,8 @@ const SERIES_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
   [/\bSeries\s+(\d+i\S*)/i, (m) => `Series ${m[1]}`],
   [/[αa]i[\s-]*(?:series|Series)\b/i, () => "αi Series"],
   [/\b(?:series|Series)[\s-]*[αa]i\b/i, () => "αi Series"],
+  [/\bAlphai[\s-]*Series\b/i, () => "Alphai Series"],
+  [/\bAlphai\b/i, () => "Alphai Series"],
   [/\bMacro\s*B\b/i, () => "Macro B"],
   [/\bKRC\s*(\d+)/i, (m) => `KRC${m[1]}`],
   [/\bKR\s*C(\d+)/i, (m) => `KRC${m[1]}`],
@@ -86,13 +89,39 @@ const GENERIC_NAMES = new Set([
 const PART_NUMBER_RE =
   /^[A-Z]\d{2}[A-Z]-\d|^\d{1,2}[A-Z]{2}\d{4}|^\d{6,}|^[A-Z0-9]{2,4}-[A-Z0-9]{2,4}-[A-Z0-9]{2,4}/i;
 
+const DESCRIPTIVE_TAG_PATTERNS: { pattern: RegExp; label: string }[] = [
+  { pattern: /\bstandard\s+control\s+program\b/i, label: "Standard control program" },
+  { pattern: /\bquick\s+start\b/i, label: "Quick start" },
+  { pattern: /\bcontrol\s+program\b/i, label: "Control program" },
+  { pattern: /\bfirmware\b/i, label: "Firmware" },
+  { pattern: /\bsoftware\b/i, label: "Software" },
+  { pattern: /\bhardware\b/i, label: "Hardware" },
+  { pattern: /\binverter\b/i, label: "Inverter" },
+  { pattern: /\boption\s+(?:card|module|unit)\b/i, label: "Option" },
+  { pattern: /\bcommunication\b|\bcommunications\b/i, label: "Communication" },
+  { pattern: /\bsafety\b/i, label: "Safety" },
+  { pattern: /\binstallation\b/i, label: "Installation" },
+  { pattern: /\bmaintenance\b|\bservice\s+manual\b/i, label: "Maintenance" },
+  { pattern: /\btroubleshooting\b|\bdiagnostics\b/i, label: "Troubleshooting" },
+  { pattern: /\bprogramming\b/i, label: "Programming" },
+  { pattern: /\breference\b/i, label: "Reference" },
+  { pattern: /\buser\s+guide\b|\buser'?s?\s+manual\b/i, label: "User guide" },
+];
+
+function inferDescriptiveTagFromManualName(manualName: string): string {
+  for (const { pattern, label } of DESCRIPTIVE_TAG_PATTERNS) {
+    if (pattern.test(manualName)) return label;
+  }
+  return "";
+}
+
 export function extractSeries(manualName: string, brandName: string): string {
-  const stripped = manualName
+  const cleaned = washManualTitle(manualName);
+  const stripped = cleaned
     .replace(
       new RegExp(`^${brandName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`, "i"),
       ""
     )
-    .replace(/^\[PDF\]\s*/i, "")
     .trim();
 
   for (const [pattern, extract] of SERIES_PATTERNS) {
@@ -112,7 +141,8 @@ export function manualLabel(
   brandName: string,
   series: string
 ): string {
-  let label = manualName
+  const cleanedName = washManualTitle(manualName);
+  let label = cleanedName
     .replace(
       new RegExp(`^${brandName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`, "i"),
       ""
@@ -126,7 +156,11 @@ export function manualLabel(
     .replace(/\s+/g, " ")
     .trim();
 
-  if (!label || label.length < 2) label = "General";
+  const norm = label.replace(/\s+/g, " ").trim().toLowerCase();
+  if (!label || label.length < 2 || norm === "general") {
+    const inferred = inferDescriptiveTagFromManualName(cleanedName);
+    return inferred;
+  }
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 

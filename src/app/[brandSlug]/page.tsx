@@ -47,6 +47,7 @@ const TAG_PRIORITY: Record<string, number> = {
 };
 
 function tagPriority(label: string): number {
+  if (!label.trim()) return 0;
   const lower = label.toLowerCase();
   for (const [key, val] of Object.entries(TAG_PRIORITY)) {
     if (lower.includes(key)) return val;
@@ -155,12 +156,19 @@ export default async function BrandPage({ params, searchParams }: Props) {
       a.code.localeCompare(b.code, undefined, { numeric: true })
     );
 
-    // Build filter tags (only include tags that survived dedup)
-    const usedTags = new Set(codes.map((fc) => labelById.get(fc.manualId) ?? "General"));
+    // Build filter tags (only include tags that survived dedup; omit empty / "General")
+    const usedTags = new Set(
+      codes.map((fc) => labelById.get(fc.manualId) ?? "")
+    );
     const tags = group.manuals
       .map((m) => m.label)
-      .filter((label, i, arr) => arr.indexOf(label) === i && usedTags.has(label))
-      .sort((a, b) => (tagPriority(b) - tagPriority(a)));
+      .filter(
+        (label, i, arr) =>
+          label.trim() !== "" &&
+          arr.indexOf(label) === i &&
+          usedTags.has(label)
+      )
+      .sort((a, b) => tagPriority(b) - tagPriority(a));
 
     const items: SeriesFaultItem[] = codes.map((fc) => {
       const loc = localized(fc, locale);
@@ -171,7 +179,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
         title: loc.title,
         description: loc.description,
         href: `/${brand.slug}/${manualSlug}/${fc.slug}`,
-        tag: labelById.get(fc.manualId) ?? "General",
+        tag: labelById.get(fc.manualId) ?? "",
       };
     });
 

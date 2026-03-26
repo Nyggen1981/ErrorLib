@@ -5,6 +5,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { log } from "./logger.js";
 import { enqueueFaultCode, flushDbQueue, queueSize } from "./db.js";
 
+export { washManualTitle } from "../../src/lib/manual-title-wash.js";
+
 export type ExtractedCode = {
   code: string;
   title: string;

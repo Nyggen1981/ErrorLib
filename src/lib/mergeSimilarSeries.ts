@@ -52,11 +52,24 @@ function tokenSortKey(s: string): string {
 }
 
 /**
+ * Leading drive-style code at the start of the label (e.g. A1000, V1000, J1000).
+ * If two series both have such a token and they differ, they must not merge even when
+ * the rest of the title is similar (Yaskawa and similar catalogs).
+ */
+function leadingLetterDigitProductToken(s: string): string | null {
+  const m = s.trim().match(/^\s*([A-Za-z]\d{3,})/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+/**
  * Similarity for grouping: max of raw and token-order–invariant Levenshtein,
  * so "SYSMAC CJ2 CPU" vs "CJ-series CJ2 CPU" can still cluster when tokens overlap.
  */
 export function seriesNameSimilarity(a: string, b: string): number {
   if (a.trim().toLowerCase() === b.trim().toLowerCase()) return 1;
+  const la = leadingLetterDigitProductToken(a);
+  const lb = leadingLetterDigitProductToken(b);
+  if (la !== null && lb !== null && la !== lb) return 0;
   const l1 = normalizedLevenshteinSimilarity(a, b);
   const l2 = normalizedLevenshteinSimilarity(tokenSortKey(a), tokenSortKey(b));
   return Math.max(l1, l2);

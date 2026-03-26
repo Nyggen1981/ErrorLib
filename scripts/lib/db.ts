@@ -1,6 +1,7 @@
 import { PrismaClient } from "../../generated/prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { log } from "./logger.js";
+import { washManualTitle } from "../../src/lib/manual-title-wash.js";
 
 let _prisma: PrismaClient | null = null;
 
@@ -44,12 +45,14 @@ export async function upsertManual(
   pdfUrl?: string
 ) {
   const prisma = getPrisma();
+  const cleanName = washManualTitle(name);
+  const slug = slugify(cleanName);
   return prisma.manual.upsert({
-    where: { slug: slugify(name) },
-    update: { name, pdfUrl },
+    where: { slug },
+    update: { name: cleanName, pdfUrl },
     create: {
-      name,
-      slug: slugify(name),
+      name: cleanName,
+      slug,
       brandId,
       pdfUrl,
     },

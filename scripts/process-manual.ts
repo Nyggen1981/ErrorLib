@@ -4,6 +4,7 @@ import path from "path";
 import OpenAI from "openai";
 import { PrismaClient } from "../generated/prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
+import { washManualTitle } from "../src/lib/manual-title-wash.js";
 
 const adapter = new PrismaNeon({
   connectionString: process.env.DATABASE_URL!,
@@ -69,7 +70,8 @@ async function processManual(
   options?: { pdfUrl?: string; imageUrl?: string }
 ) {
   const brandSlug = slugify(brandName);
-  const manualSlug = slugify(manualName);
+  const cleanManualName = washManualTitle(manualName);
+  const manualSlug = slugify(cleanManualName);
 
   const brand = await prisma.brand.upsert({
     where: { slug: brandSlug },
@@ -80,12 +82,12 @@ async function processManual(
   const manual = await prisma.manual.upsert({
     where: { slug: manualSlug },
     update: {
-      name: manualName,
+      name: cleanManualName,
       pdfUrl: options?.pdfUrl,
       imageUrl: options?.imageUrl,
     },
     create: {
-      name: manualName,
+      name: cleanManualName,
       slug: manualSlug,
       brandId: brand.id,
       pdfUrl: options?.pdfUrl,
@@ -93,7 +95,7 @@ async function processManual(
     },
   });
 
-  console.log(`Processing ${brandName} ${manualName}...`);
+  console.log(`Processing ${brandName} ${cleanManualName}...`);
   let totalCodes = 0;
 
   for (const imgPath of imagePaths) {
