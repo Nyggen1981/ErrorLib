@@ -8,13 +8,25 @@ function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
-async function getRetryableBrands(
+function getRetryableBrands(
   allLogs: { brand: string; manual: string; status: string; codesFound: number }[]
 ) {
   const succeededManuals = new Set(
     allLogs
       .filter((l) => l.status === "success")
       .map((l) => `${l.brand}::${l.manual}`)
+  );
+
+  // A "skipped" entry with "(all cached" means the brand went through retry-all
+  // and found nothing new — count the entire brand as exhausted
+  const exhaustedBrands = new Set(
+    allLogs
+      .filter(
+        (l) =>
+          l.status === "skipped" &&
+          l.manual.includes("all cached")
+      )
+      .map((l) => l.brand.toLowerCase())
   );
 
   // Count how many times each manual has been attempted (failed/aborted/empty)
@@ -24,32 +36,20 @@ async function getRetryableBrands(
       l.status === "empty" ||
       l.status === "failed" ||
       l.status === "aborted" ||
-      (l.codesFound === 0 && l.status !== "skipped")
+      (l.codesFound === 0 && l.status !== "skipped" && l.status !== "success")
     ) {
       const key = `${l.brand}::${l.manual}`;
       attemptCounts.set(key, (attemptCounts.get(key) || 0) + 1);
     }
   }
 
-  // Count force-retry queue entries per brand (any status — pending/processing/completed)
-  const previousRetries = await prisma.miningQueue.findMany({
-    where: { targetManuals: { has: "__FORCE_RETRY__" } },
-    select: { brandName: true },
-  });
-  const brandQueueRetries = new Map<string, number>();
-  for (const q of previousRetries) {
-    const key = q.brandName.toLowerCase();
-    brandQueueRetries.set(key, (brandQueueRetries.get(key) || 0) + 1);
-  }
-
-  // Effective attempts = log failures + queue-level force retries
   const retryableManuals = [...attemptCounts.entries()].filter(
     ([key, count]) => {
       const brand = key.split("::")[0];
-      const queueAttempts = brandQueueRetries.get(brand.toLowerCase()) || 0;
       return (
         !succeededManuals.has(key) &&
-        count + queueAttempts < MAX_ATTEMPTS
+        !exhaustedBrands.has(brand.toLowerCase()) &&
+        count < MAX_ATTEMPTS
       );
     }
   );
@@ -65,7 +65,7 @@ export async function GET() {
     select: { brand: true, manual: true, status: true, codesFound: true },
   });
 
-  const uniqueBrands = await getRetryableBrands(allLogs);
+  const uniqueBrands = getRetryableBrands(allLogs);
 
   const alreadyQueued = await prisma.miningQueue.findMany({
     where: {
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
       select: { brand: true, manual: true, status: true, codesFound: true },
     });
 
-    const uniqueBrands = await getRetryableBrands(allLogs);
+    const uniqueBrands = getRetryableBrands(allLogs);
 
     const alreadyQueued = await prisma.miningQueue.findMany({
       where: {

@@ -690,6 +690,17 @@ async function runBrandList(
         status: count > 0 ? "OK" : "EMPTY",
       });
 
+      if (isForceRetry && count === 0) {
+        await createMiningLog({
+          brand,
+          manual: "(all cached – retry exhausted)",
+          codesFound: 0,
+          pagesScanned: 0,
+          durationMs: 0,
+          status: "skipped",
+        });
+      }
+
       if (count > 0) {
         try {
           await notifyUsersForBrand(brand);
