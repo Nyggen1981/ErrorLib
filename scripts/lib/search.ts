@@ -1,11 +1,44 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { washManualTitle } from "../../src/lib/manual-title-wash.js";
 import { log } from "./logger.js";
 
 /** Gemini returns this exact string when the hit is consumer / non-industrial */
 export const CONSUMER_MANUAL_SKIP = "CONSUMER_ELECTRONICS_SKIP";
 
+/**
+ * If title or snippet matches, skip the hit before Gemini (saves API) and treat any
+ * matching manual name as out-of-scope (see isConsumerSkipManualName).
+ */
+export const FORBIDDEN_KEYWORDS = [
+  "blood pressure",
+  "sphygmomanometer",
+  "coffee maker",
+  "espresso",
+  "coffee",
+  "massage",
+  "nebulizer",
+] as const;
+
+function textMatchesForbidden(text: string): boolean {
+  const lower = text.toLowerCase();
+  return FORBIDDEN_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
+/** Pre-filter Serper organic results (title + snippet). */
+export function isSearchHitForbidden(result: {
+  title: string;
+  snippet: string;
+}): boolean {
+  return textMatchesForbidden(`${result.title} ${result.snippet}`);
+}
+
+/**
+ * True if Gemini returned CONSUMER_ELECTRONICS_SKIP or the name contains hard
+ * consumer / medical-home keywords (regardless of model output).
+ */
 export function isConsumerSkipManualName(name: string): boolean {
-  return name.trim().toUpperCase() === CONSUMER_MANUAL_SKIP;
+  if (name.trim().toUpperCase() === CONSUMER_MANUAL_SKIP) return true;
+  return textMatchesForbidden(name);
 }
 
 const MANUAL_NAME_SYSTEM_INSTRUCTION = `You help catalogue industrial equipment manuals only (automation, drives, PLCs, robots, CNC, process control, industrial power, machine tools).
@@ -78,11 +111,17 @@ export async function searchManuals(
       if (seenUrls.has(result.link)) continue;
       if (!isPdfUrl(result.link)) continue;
 
+      const snippet = result.snippet ?? "";
+      if (isSearchHitForbidden({ title: result.title, snippet })) {
+        log.detail(`  [BLOCKLIST] Skipping search hit: ${result.title.slice(0, 72)}…`);
+        continue;
+      }
+
       seenUrls.add(result.link);
       allResults.push({
         title: result.title,
         link: result.link,
-        snippet: result.snippet ?? "",
+        snippet,
       });
     }
   }
@@ -108,11 +147,12 @@ export function extractManualNameFallback(title: string, brand: string): string 
   const modelMatch = name.match(
     /\b([A-Z]{2,}[\s-]?[A-Z0-9]*[\s-]?\d{2,}[A-Z0-9/-]*)\b/i
   );
-  if (modelMatch) return modelMatch[1].trim();
+  if (modelMatch) name = modelMatch[1].trim();
 
   if (name.length > 60) name = name.substring(0, 60).trim();
 
-  return name || title.substring(0, 40).trim();
+  const raw = name || title.substring(0, 40).trim();
+  return washManualTitle(raw);
 }
 
 export async function extractManualName(
@@ -175,7 +215,8 @@ Return ONLY the name, nothing else.`
       return CONSUMER_MANUAL_SKIP;
     }
     if (cleaned.length > 3 && cleaned.length < 80) {
-      return cleaned;
+      const washed = washManualTitle(cleaned);
+      return washed.length > 0 ? washed : extractManualNameFallback(title, brand);
     }
   } catch {
     log.detail(`  Title cleanup skipped (API unavailable), using fallback`);

@@ -451,6 +451,7 @@ async function mine(
 
   for (const pdf of textPdfs) {
     const manualName = await extractManualName(pdf.title, pdf.url, brand, existingNames);
+    // Gemini CONSUMER_ELECTRONICS_SKIP plus hard keyword match on final name (search.ts FORBIDDEN_KEYWORDS).
     if (isConsumerSkipManualName(manualName)) {
       log.warn(
         `  Skipping out-of-scope (consumer / non-industrial) manual: ${pdf.title}`
@@ -531,7 +532,7 @@ async function mine(
       const manualName = await extractManualName(dl.title, dl.url, brand, existingNames);
       if (isConsumerSkipManualName(manualName)) {
         log.warn(
-          `  [OCR] Skipping out-of-scope (consumer / non-industrial): ${dl.title}`
+          `  [OCR] Skipping out-of-scope (consumer / blocklist keywords in name): ${dl.title}`
         );
         savings.skippedNoRelevance++;
         continue;

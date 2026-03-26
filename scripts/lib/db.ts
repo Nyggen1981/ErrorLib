@@ -45,6 +45,8 @@ export async function upsertManual(
   pdfUrl?: string
 ) {
   const prisma = getPrisma();
+  // Single source of truth: stored name and slug always derive from washed title
+  // (no leading [PDF]/Manual noise, no Greek letters in slug).
   const cleanName = washManualTitle(name);
   const slug = slugify(cleanName);
   return prisma.manual.upsert({
