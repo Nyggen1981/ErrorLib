@@ -6,6 +6,7 @@ import {
   extractManualName,
   isConsumerSkipManualName,
 } from "./lib/search.js";
+import { shouldSkipManual } from "../src/lib/industrial-filter.js";
 import { downloadPdf, ensureTempDir } from "./lib/download.js";
 import { extractDiagnosticText } from "./lib/pdf-parser.js";
 import { extractAndSave, extractWithOcr, preflight } from "./lib/extract.js";
@@ -450,8 +451,16 @@ async function mine(
   const existingNames = existingManuals.map((m) => m.name);
 
   for (const pdf of textPdfs) {
+    if (shouldSkipManual(pdf.title)) {
+      log.warn(
+        `  [FILTER] Skipping PDF (out-of-scope keywords in title, no Gemini): ${pdf.title.slice(0, 80)}`
+      );
+      savings.skippedNoRelevance++;
+      continue;
+    }
+
     const manualName = await extractManualName(pdf.title, pdf.url, brand, existingNames);
-    // Gemini CONSUMER_ELECTRONICS_SKIP plus hard keyword match on final name (search.ts FORBIDDEN_KEYWORDS).
+    // CONSUMER_ELECTRONICS_SKIP from Gemini plus shouldSkipManual on resolved name (industrial-filter).
     if (isConsumerSkipManualName(manualName)) {
       log.warn(
         `  Skipping out-of-scope (consumer / non-industrial) manual: ${pdf.title}`
@@ -529,6 +538,14 @@ async function mine(
 
     for (const dl of ocrCandidates) {
       const fn = path.basename(dl.pdfPath);
+      if (shouldSkipManual(dl.title)) {
+        log.warn(
+          `  [OCR] [FILTER] Skipping (out-of-scope keywords in title): ${dl.title.slice(0, 80)}`
+        );
+        savings.skippedNoRelevance++;
+        continue;
+      }
+
       const manualName = await extractManualName(dl.title, dl.url, brand, existingNames);
       if (isConsumerSkipManualName(manualName)) {
         log.warn(

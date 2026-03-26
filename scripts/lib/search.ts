@@ -1,44 +1,18 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { washManualTitle } from "../../src/lib/manual-title-wash.js";
+import { shouldSkipManual } from "../../src/lib/industrial-filter.js";
 import { log } from "./logger.js";
 
 /** Gemini returns this exact string when the hit is consumer / non-industrial */
 export const CONSUMER_MANUAL_SKIP = "CONSUMER_ELECTRONICS_SKIP";
 
 /**
- * If title or snippet matches, skip the hit before Gemini (saves API) and treat any
- * matching manual name as out-of-scope (see isConsumerSkipManualName).
- */
-export const FORBIDDEN_KEYWORDS = [
-  "blood pressure",
-  "sphygmomanometer",
-  "coffee maker",
-  "espresso",
-  "coffee",
-  "massage",
-  "nebulizer",
-] as const;
-
-function textMatchesForbidden(text: string): boolean {
-  const lower = text.toLowerCase();
-  return FORBIDDEN_KEYWORDS.some((kw) => lower.includes(kw));
-}
-
-/** Pre-filter Serper organic results (title + snippet). */
-export function isSearchHitForbidden(result: {
-  title: string;
-  snippet: string;
-}): boolean {
-  return textMatchesForbidden(`${result.title} ${result.snippet}`);
-}
-
-/**
- * True if Gemini returned CONSUMER_ELECTRONICS_SKIP or the name contains hard
- * consumer / medical-home keywords (regardless of model output).
+ * True if Gemini returned CONSUMER_ELECTRONICS_SKIP or shouldSkipManual(name)
+ * (see src/lib/industrial-filter.ts).
  */
 export function isConsumerSkipManualName(name: string): boolean {
   if (name.trim().toUpperCase() === CONSUMER_MANUAL_SKIP) return true;
-  return textMatchesForbidden(name);
+  return shouldSkipManual(name);
 }
 
 const MANUAL_NAME_SYSTEM_INSTRUCTION = `You help catalogue industrial equipment manuals only (automation, drives, PLCs, robots, CNC, process control, industrial power, machine tools).
@@ -112,7 +86,7 @@ export async function searchManuals(
       if (!isPdfUrl(result.link)) continue;
 
       const snippet = result.snippet ?? "";
-      if (isSearchHitForbidden({ title: result.title, snippet })) {
+      if (shouldSkipManual(`${result.title} ${snippet}`)) {
         log.detail(`  [BLOCKLIST] Skipping search hit: ${result.title.slice(0, 72)}…`);
         continue;
       }
@@ -161,6 +135,10 @@ export async function extractManualName(
   brand: string,
   existingNames?: string[]
 ): Promise<string> {
+  if (shouldSkipManual(title)) {
+    return CONSUMER_MANUAL_SKIP;
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return extractManualNameFallback(title, brand);
 
