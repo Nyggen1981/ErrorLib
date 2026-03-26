@@ -167,7 +167,11 @@ async function setQueueStatus(
   status: "processing" | "completed"
 ): Promise<void> {
   const prisma = getPrisma();
-  await prisma.miningQueue.update({ where: { id }, data: { status } });
+  try {
+    await prisma.miningQueue.update({ where: { id }, data: { status } });
+  } catch {
+    // Record may have been removed via admin UI — ignore
+  }
 }
 
 async function deleteQueueItem(id: string): Promise<void> {
