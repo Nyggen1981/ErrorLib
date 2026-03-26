@@ -4,7 +4,7 @@
   "description": "SEO-optimized industrial fault code library",
   "scripts": {
     "dev": "next dev",
-    "build": "npx prisma generate && next build",
+    "build": "npx prisma generate && npx tsx scripts/generate-sitemap.ts && next build",
     "postinstall": "prisma generate || echo 'prisma generate skipped'",
     "start": "next start",
     "lint": "next lint",
@@ -13,6 +13,7 @@
     "db:studio": "npx prisma studio",
     "db:generate": "npx prisma generate",
     "db:seed": "npx tsx prisma/seed.ts",
+    "generate:sitemap": "npx tsx scripts/generate-sitemap.ts",
     "process-manual": "npx tsx scripts/process-manual.ts",
     "mine": "npx tsx scripts/auto-miner.ts",
     "push-google": "npx tsx scripts/push-to-google.ts"
