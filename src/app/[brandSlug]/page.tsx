@@ -421,7 +421,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
         </div>
       )}
 
-      <RequestForm locale={locale} defaultBrand={brand.name} />
+      <RequestForm locale={locale} defaultBrand={brand.name} variant="brand" />
     </div>
   );
 }

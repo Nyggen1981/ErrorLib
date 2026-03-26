@@ -9,11 +9,13 @@ export function RequestForm({
   defaultBrand = "",
   defaultModel = "",
   compact = false,
+  variant = "default",
 }: {
   locale: Locale;
   defaultBrand?: string;
   defaultModel?: string;
   compact?: boolean;
+  variant?: "default" | "brand";
 }) {
   const [brand, setBrand] = useState(defaultBrand);
   const [model, setModel] = useState(defaultModel);
@@ -124,6 +126,64 @@ export function RequestForm({
             {t("somethingWrong", locale)}
           </p>
         )}
+      </div>
+    );
+  }
+
+  if (variant === "brand") {
+    const prompt = t("missingModelPrompt", locale).replace("{brand}", defaultBrand);
+
+    return (
+      <div className="mt-10 border-t border-technical-700 pt-8">
+        <div className="mx-auto max-w-xl">
+          <p className="mb-3 text-sm text-technical-300">{prompt}</p>
+
+          {showSuccess ? (
+            <div className="rounded-lg border border-success/20 bg-success/10 px-4 py-3 text-center">
+              <p className="text-xs font-medium text-success">
+                {status === "voted"
+                  ? `${t("thankVoted", locale)} ${voteCount} ${t("votes", locale)}.`
+                  : t("thankCreated", locale)}
+              </p>
+            </div>
+          ) : (
+            <form
+              onSubmit={handleSubmit}
+              className="flex flex-col gap-2 sm:flex-row sm:items-center"
+            >
+              <input type="hidden" value={brand} />
+              <input
+                type="text"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder={t("modelPlaceholder", locale)}
+                className="flex-1 rounded-lg border border-technical-600 bg-technical-800 px-3 py-2 text-sm text-white placeholder-technical-400 outline-none transition focus:border-accent"
+              />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={t("emailPlaceholder", locale)}
+                className="flex-1 rounded-lg border border-technical-600 bg-technical-800 px-3 py-2 text-sm text-white placeholder-technical-400 outline-none transition focus:border-accent"
+              />
+              <button
+                type="submit"
+                disabled={status === "loading" || !brand.trim()}
+                className="shrink-0 rounded-lg bg-accent px-5 py-2 text-sm font-bold text-technical-900 transition hover:bg-accent/90 disabled:opacity-50"
+              >
+                {status === "loading"
+                  ? t("sending", locale)
+                  : t("requestBtn", locale)}
+              </button>
+            </form>
+          )}
+
+          {status === "error" && (
+            <p className="mt-2 text-center text-xs text-danger">
+              {t("somethingWrong", locale)}
+            </p>
+          )}
+        </div>
       </div>
     );
   }

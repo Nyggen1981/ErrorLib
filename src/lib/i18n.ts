@@ -73,6 +73,12 @@ const dict = {
     de: "Senden Sie eine Anfrage und unser Team wird das Hinzufügen zu unserer technischen Bibliothek priorisieren.",
     es: "Envíe una solicitud y nuestro equipo priorizará agregarla a nuestra biblioteca técnica.",
   },
+  missingModelPrompt: {
+    en: "Missing a specific {brand} model? Tell us which one.",
+    no: "Savner du en spesifikk {brand}-modell? Fortell oss hvilken.",
+    de: "Fehlt ein bestimmtes {brand}-Modell? Sagen Sie uns welches.",
+    es: "¿Falta un modelo específico de {brand}? Díganos cuál.",
+  },
   brandPlaceholder: { en: "Brand (e.g. Mitsubishi)", no: "Merke (f.eks. Mitsubishi)", de: "Marke (z.B. Mitsubishi)", es: "Marca (ej. Mitsubishi)" },
   modelPlaceholder: { en: "Model (optional)", no: "Modell (valgfritt)", de: "Modell (optional)", es: "Modelo (opcional)" },
   emailPlaceholder: {
