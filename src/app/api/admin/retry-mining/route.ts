@@ -10,18 +10,30 @@ export async function GET() {
   const authed = await isAdminAuthenticated();
   if (!authed) return unauthorized();
 
-  const failedLogs = await prisma.miningLog.findMany({
-    where: {
-      OR: [
-        { status: { in: ["empty", "failed", "aborted"] } },
-        { codesFound: 0, status: { not: "skipped" } },
-      ],
-    },
-    orderBy: { createdAt: "desc" },
-    select: { brand: true, manual: true, status: true, createdAt: true },
+  const allLogs = await prisma.miningLog.findMany({
+    select: { brand: true, manual: true, status: true, codesFound: true },
   });
 
-  const uniqueBrands = [...new Set(failedLogs.map((l) => l.brand))];
+  const succeededManuals = new Set(
+    allLogs
+      .filter((l) => l.status === "success")
+      .map((l) => `${l.brand}::${l.manual}`)
+  );
+
+  const failedBrands = new Set(
+    allLogs
+      .filter(
+        (l) =>
+          (l.status === "empty" ||
+            l.status === "failed" ||
+            l.status === "aborted" ||
+            (l.codesFound === 0 && l.status !== "skipped")) &&
+          !succeededManuals.has(`${l.brand}::${l.manual}`)
+      )
+      .map((l) => l.brand)
+  );
+
+  const uniqueBrands = [...failedBrands];
 
   const alreadyQueued = await prisma.miningQueue.findMany({
     where: {
@@ -37,7 +49,7 @@ export async function GET() {
   );
 
   return NextResponse.json({
-    totalFailed: failedLogs.length,
+    totalFailed: uniqueBrands.length,
     uniqueBrands: uniqueBrands.length,
     retryableBrands: retryable,
     alreadyQueued: alreadyQueued.map((q) => q.brandName),
