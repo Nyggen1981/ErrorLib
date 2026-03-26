@@ -45,41 +45,70 @@ type SeriesGroup = {
 // ── Smart Grouping Engine ──
 
 const SERIES_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
+  // ABB
   [/\b(ACS\d{3})/i, (m) => m[1].toUpperCase()],
   [/\b(AC500)/i, () => "AC500"],
   [/\b(AX\d{4})/i, (m) => m[1].toUpperCase()],
+  // Allen-Bradley / Rockwell
   [/\b(PowerFlex)\s*(\d+)/i, (m) => `PowerFlex ${m[2]}`],
+  // Danfoss
   [/\b(VLT)\s+([\w-]+)/i, (m) => `VLT ${m[2]}`],
   [/\b(FC\s*\d{2,3})/i, (m) => m[1].replace(/\s+/g, "").toUpperCase()],
+  // Siemens
   [/\b(SINAMICS)\s+(\w+)/i, (m) => `SINAMICS ${m[2]}`],
   [/\b(SINUMERIK)\s+(\w+)/i, (m) => `SINUMERIK ${m[2]}`],
+  // SEW
   [/\b(MOVIDRIVE)\b/i, () => "MOVIDRIVE"],
   [/\b(MOVIFIT)\b/i, () => "MOVIFIT"],
   [/\b(MCBSM)\b/i, () => "MCBSM"],
+  // Schneider
   [/\b(Altivar|ALTIVAR|ATV)\s*(\d+)/i, (m) => `Altivar ${m[2]}`],
   [/\b(Altistart)\s*(\d+)/i, (m) => `Altistart ${m[2]}`],
   [/\b(XW\s*Pro)\b/i, () => "XW Pro"],
+  // Beckhoff
   [/\b(TwinCAT)\s*(\d*)/i, (m) => m[2] ? `TwinCAT ${m[2]}` : "TwinCAT"],
   [/\b(TwinSAFE)\b/i, () => "TwinSAFE"],
+  // Mitsubishi
   [/\b(FR[-\s]?[A-Z]\d{3})/i, (m) => m[1].replace(/\s+/g, "").replace(/-/g, "-").toUpperCase()],
+  // Vacon
   [/\b(NXS|NXP)\b/i, () => "NXS/NXP"],
+  // Omron
   [/\b(MX2)\b/i, () => "MX2"],
   [/\b(SXF)\b/i, () => "SXF"],
   [/\b(3G3EV)\b/i, () => "3G3EV"],
+  // Daikin / HVAC
   [/\b(BP\d{3})/i, (m) => m[1].toUpperCase()],
   [/\b(MSZ[-\s]?\w+)/i, (m) => m[1].replace(/\s+/g, "").toUpperCase()],
   [/\b(PUZ[-\s]?\w+)/i, (m) => m[1].replace(/\s+/g, "").toUpperCase()],
+  // Fanuc — must be before generic fallback
+  [/\b(R-30i[AB]\w*)/i, (m) => m[1].toUpperCase()],
+  [/\bSeries\s+(0i[-\s]?\w*)/i, (m) => `Series ${m[1].replace(/\s+/g, "")}`],
+  [/\bSeries\s+(3[012]i\S*)/i, (m) => `Series ${m[1]}`],
+  [/\bSeries\s+(\d+i\S*)/i, (m) => `Series ${m[1]}`],
+  [/[αa]i[\s-]*(?:series|Series)\b/i, () => "αi Series"],
+  [/\b(?:series|Series)[\s-]*[αa]i\b/i, () => "αi Series"],
+  [/\bMacro\s*B\b/i, () => "Macro B"],
+  [/\bKRC\s*(\d+)/i, (m) => `KRC${m[1]}`],
+  [/\bKR\s*C(\d+)/i, (m) => `KRC${m[1]}`],
+  // Generic model number fallback (must be last)
   [/\b([A-Z]\d{3,4})\b/i, (m) => m[1].toUpperCase()],
 ];
 
 const GENERIC_NAMES = new Set([
   "system", "general", "other", "misc", "unknown",
   "diagnostics", "alarms", "faults", "list",
+  "connection", "manual", "manual guide", "guide",
+  "maintenance", "parameter", "parameters", "information",
+  "service", "bulletin", "installation", "reference",
+  "description", "operator", "document",
 ]);
+
+const PART_NUMBER_RE = /^[A-Z]\d{2}[A-Z]-\d|^\d{1,2}[A-Z]{2}\d{4}|^\d{6,}|^[A-Z0-9]{2,4}-[A-Z0-9]{2,4}-[A-Z0-9]{2,4}/i;
 
 function extractSeries(manualName: string, brandName: string): string {
   const stripped = manualName
     .replace(new RegExp(`^${brandName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`, "i"), "")
+    .replace(/^\[PDF\]\s*/i, "")
     .trim();
 
   for (const [pattern, extract] of SERIES_PATTERNS) {
@@ -89,8 +118,8 @@ function extractSeries(manualName: string, brandName: string): string {
 
   const words = stripped.split(/\s+/);
   const lead = words
-    .slice(0, 2)
-    .filter((w) => /^[A-Z0-9]/.test(w) && w.length >= 2);
+    .slice(0, 3)
+    .filter((w) => /^[A-Z0-9]/.test(w) && w.length >= 2 && !PART_NUMBER_RE.test(w));
   return lead.length > 0 ? lead.join(" ") : words.slice(0, 2).join(" ");
 }
 
