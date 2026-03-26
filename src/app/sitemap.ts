@@ -7,7 +7,7 @@ const BASE = "https://errorlib.net";
 const CHUNK_SIZE = 1000;
 const REVALIDATE_SECONDS = 60 * 60;
 
-export const revalidate = REVALIDATE_SECONDS;
+export const revalidate = 3600;
 
 async function getActiveLanguages(): Promise<Locale[]> {
   try {
@@ -156,12 +156,13 @@ export async function generateSitemaps() {
 export default async function sitemap({
   id,
 }: {
-  id: number;
+  id?: number | string;
 }): Promise<MetadataRoute.Sitemap> {
-  if (id === 0) {
+  const normalizedId = Number(id ?? 0);
+  if (!Number.isFinite(normalizedId) || normalizedId <= 0) {
     return getCachedSiteUrls();
   }
 
-  const faultChunkId = id - 1;
+  const faultChunkId = normalizedId - 1;
   return getCachedFaultCodeChunk(faultChunkId);
 }
