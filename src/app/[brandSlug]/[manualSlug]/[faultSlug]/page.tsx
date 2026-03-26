@@ -10,6 +10,7 @@ import {
   TranslatingBanner,
 } from "@/components/FaultCodeContent";
 import { AdSlot } from "@/components/AdSlot";
+import { SupportProjectCallout } from "@/components/SupportProjectCallout";
 import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
 import type { Metadata } from "next";
@@ -348,6 +349,8 @@ export default async function FaultCodePage({ params }: Props) {
               </div>
             </div>
           </div>
+
+          <SupportProjectCallout />
         </TranslatedContent>
       </div>
     </>
