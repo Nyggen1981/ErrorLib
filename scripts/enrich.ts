@@ -71,16 +71,22 @@ async function main() {
   const brandFilter = args.find((a) => a.startsWith("--brand="))?.split("=")[1];
   const manualFilter = args.find((a) => a.startsWith("--manual="))?.split("=")[1];
   const dryRun = args.includes("--dry");
+  const force = args.includes("--force");
 
   console.log("🔧 ErrorLib Enrichment Script");
+  if (force) console.log("⚡ FORCE MODE: re-processing all matching codes");
   console.log("━".repeat(50));
 
-  const where: Record<string, unknown> = {
-    OR: [
+  const where: Record<string, unknown> = {};
+
+  if (!force) {
+    where.OR = [
+      { causes: { equals: [] } },
       { causes: { isEmpty: true } },
+      { requiredTools: { equals: [] } },
       { requiredTools: { isEmpty: true } },
-    ],
-  };
+    ];
+  }
 
   if (brandFilter) {
     const brand = await prisma.brand.findFirst({
