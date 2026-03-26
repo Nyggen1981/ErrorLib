@@ -77,6 +77,12 @@ MANDATORY RULES FOR fixSteps:
 4. If the manual lists specific parameter numbers, voltage/resistance values, or terminal designations for a fix, you MUST include them.
 5. If the source text provides no actionable fix data for a code beyond generic advice, return fewer steps rather than padding with generics.
 
+TEXT FORMATTING RULES (apply to ALL string fields):
+1. Parameters: Write as a single unbroken token — "P1-54" NOT "P1 -54" or "P1- 54". No spaces between prefix, hyphen, and number.
+2. Parentheses: Every opening ( MUST have a closing ). Never leave dangling parentheses. Use parentheses ONLY for short technical references like "(Brake torque)" or "(24VDC)". Do NOT wrap entire sentences in parentheses.
+3. No double spaces. No leading/trailing whitespace in array items.
+4. Do NOT use markdown bold (**) in any field — we handle formatting in the UI.
+
 Strict filtering:
 - Only extract ACTUAL fault/error/alarm codes. Ignore page numbers, chapter numbers, part numbers, or marketing text.
 - Deduplicate: if the same code appears on multiple pages, merge all information into one entry.

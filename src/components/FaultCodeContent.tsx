@@ -4,14 +4,16 @@ import React, { useState } from "react";
 import { useTranslation } from "./TranslatedContent";
 
 function boldTechnicalTerms(text: string): React.ReactNode[] {
-  const pattern = /\b([A-Z]{1,4}\d[\d.]*|\d{1,3}\.\d{2,}|P\d[\d.]*|[A-Z]{2,3}\d{1,2})\b/g;
+  // Matches full parameter tokens: P1-54, Par.99.06, F0001, DI1, X1:3, 30.01, etc.
+  // The key is capturing hyphens/dots/colons that are part of the identifier.
+  const pattern = /\b([A-Z]{1,4}\d[\d.]*(?:[-.:]\d[\d.]*)*|[Pp](?:ar)?\.?\d[\d.]*(?:[-.:]\d[\d.]*)*|\d{1,3}\.\d{2,}(?:\.\d+)*|[A-Z]{2,3}\d{1,2}(?:[-.:]\d+)*)\b/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(text)) !== null) {
     if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
     parts.push(
-      <strong key={match.index} className="text-technical-50">
+      <strong key={match.index} className="text-technical-50" style={{ letterSpacing: 0 }}>
         {match[0]}
       </strong>
     );
@@ -77,7 +79,7 @@ export function TranslatedAllSteps() {
               {done ? "✓" : i + 1}
             </span>
             <p
-              className={`pt-0.5 text-sm leading-relaxed transition-colors ${
+              className={`pt-0.5 text-sm leading-relaxed break-words transition-colors ${
                 done ? "text-technical-400 line-through" : "text-technical-200"
               }`}
             >
@@ -107,7 +109,7 @@ export function TranslatedCauses({ heading }: { heading: string }) {
         {causes.map((cause, i) => (
           <li key={i} className="flex items-start gap-2.5 text-sm text-technical-200">
             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400/70" />
-            {boldTechnicalTerms(cause)}
+            <span className="break-words">{boldTechnicalTerms(cause)}</span>
           </li>
         ))}
       </ul>

@@ -18,6 +18,12 @@ For each fault code provided, return:
 - "requiredTools": Array of 1-4 tools a technician needs. Examples: "Multimeter (AC/DC voltage + resistance)", "Megohmmeter 500VDC", "Laptop with manufacturer software", "Oscilloscope for signal analysis". Only list tools relevant to diagnosing this specific fault.
 - "fixSteps": Array of 3-6 detailed, numbered repair steps. Every step MUST reference a specific measurement, parameter, terminal, or verifiable action. BANNED: "check wiring", "consult manual", "replace if necessary", "ensure proper ventilation".
 
+TEXT FORMATTING RULES (apply to ALL string fields):
+1. Parameters: Write as a single unbroken token — "P1-54" NOT "P1 -54" or "P1- 54". No spaces between prefix, hyphen, and number.
+2. Parentheses: Every opening ( MUST have a closing ). Never leave dangling parentheses. Use parentheses ONLY for short technical references like "(Brake torque)" or "(24VDC)". Do NOT wrap entire sentences in parentheses.
+3. No double spaces. No leading/trailing whitespace in array items.
+4. Do NOT use markdown bold (**) in any field — we handle formatting in the UI.
+
 If you cannot produce specific causes/tools for a code, return shorter arrays rather than padding with generic content.
 
 Return ONLY valid JSON. No markdown fences, no commentary.
