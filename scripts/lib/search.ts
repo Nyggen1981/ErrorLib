@@ -116,16 +116,37 @@ export async function extractManualName(
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const result = await model.generateContent(
-      `You are naming an industrial equipment manual for a database.
+      `You are naming an industrial equipment manual for a database entry. Your goal is to identify the PRIMARY MODEL NAME the manual covers.
 
 Given this PDF search result:
 - Brand: ${brand}
 - Search title: "${title}"
 - URL: ${url}
 
-Return ONLY a short, clean, professional manual name. Include the brand and model number.
-Examples of good names: "ABB ACS580 General Purpose Drive", "Siemens SINAMICS G120 Variable Speed Drive", "ABB ACS800 Standard Firmware"
-Do NOT include "Manual", "PDF", "Fault Codes", file extensions, or marketing text.
+RULES (strictly follow):
+1. Return the brand name followed by the primary product model/series name.
+2. NEVER use a part number as the model name (e.g. "A20B-2101-0390", "6SL3210-1PE21", "E84AVSCx" are part numbers — find the actual product name they belong to).
+3. NEVER use a document type as the name (e.g. "Service Bulletin", "Parameter List", "Maintenance Manual", "Connection Guide").
+4. NEVER use generic terms (e.g. "Connection", "Guide", "Manual", "System", "Diagnostics", "Error Codes").
+5. If the URL or title contains a clear model series (e.g. "ACS880", "Series 30i", "VLT Micro Drive FC 51", "SINAMICS G120"), USE IT.
+6. Add a short descriptor only if it clarifies the product type (e.g. "Standard Firmware", "Servo Amplifier", "AC Servo Motor").
+7. Maximum 60 characters.
+
+Good examples:
+- "${brand} ACS580 General Purpose Drive"
+- "${brand} Series 30i CNC Controller"
+- "${brand} VLT Micro Drive FC 51"
+- "${brand} SINAMICS G120 Variable Speed Drive"
+- "${brand} R-30iB Robot Controller"
+- "${brand} FR-E500 Inverter"
+
+Bad examples (NEVER return these):
+- "${brand} A20B-2101-0390" (part number)
+- "${brand} Connection" (generic)
+- "${brand} Manual Guide" (document type)
+- "${brand} Service Bulletin" (document type)
+- "${brand} E84AVSCx" (part number, not product name)
+
 Return ONLY the name, nothing else.`
     );
 
