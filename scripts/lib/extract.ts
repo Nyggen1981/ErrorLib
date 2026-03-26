@@ -37,6 +37,14 @@ const INDUSTRIAL_SCOPE_SYSTEM_INSTRUCTION = `You must ONLY process manuals that 
 If the document is clearly consumer electronics or unrelated consumer products — including but not limited to blood pressure monitors, domestic coffee machines, toys, home appliances, consumer audio/video, fitness wearables, or general household gadgets — you must NOT extract any fault codes. In that case respond with exactly this JSON and nothing else:
 {"codes":[]}
 
+When you identify a product series or model family (in titles, descriptions, causes, or fix steps), be extremely specific about the exact letter-and-number designation of the product line.
+
+DO refer to lines like: "PowerFlex 750", "S7-300", "V1000".
+
+DO NOT use vague product buckets as if they were a series name, e.g. "AC Drives", "Inverter", or "Manual".
+
+If a manual covers more than one series (e.g. SINAMICS S120 and S150), name both, separated by a slash, e.g. "S120/S150".
+
 No markdown fences, no commentary, no other keys.`;
 
 function getExtractionModel() {

@@ -15,6 +15,9 @@
     "db:seed": "npx tsx prisma/seed.ts",
     "generate:sitemap": "npx tsx scripts/generate-sitemap.ts",
     "list-modules": "npx tsx scripts/list-modules.ts",
+    "list-modules:flat": "npx tsx scripts/list-modules.ts --flat",
+    "db:cleanup-brands": "npx tsx scripts/cleanup-brands-migration.ts",
+    "db:cleanup-brands:execute": "npx tsx scripts/cleanup-brands-migration.ts --execute",
     "process-manual": "npx tsx scripts/process-manual.ts",
     "mine": "npx tsx scripts/auto-miner.ts",
     "push-google": "npx tsx scripts/push-to-google.ts"
