@@ -65,8 +65,8 @@ export function TranslatedAllSteps() {
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(i); } }}
             className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors select-none ${
               done
-                ? "border-success/40 bg-success/5"
-                : "border-technical-600 bg-technical-900/50"
+                ? "border-success/40 bg-success/5 hover:bg-success/10"
+                : "border-technical-600 bg-technical-900/50 hover:bg-technical-800"
             }`}
           >
             <span

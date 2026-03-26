@@ -256,6 +256,9 @@ export default async function FaultCodePage({ params }: Props) {
                 {t("repairSteps", locale)}
               </h2>
             </div>
+            <p className="mb-3 text-xs text-technical-400">
+              {t("repairStepsHint", locale)}
+            </p>
             <TranslatedAllSteps />
 
             {manualCodesCount > 1 && (
