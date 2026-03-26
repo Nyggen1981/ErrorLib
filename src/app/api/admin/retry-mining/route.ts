@@ -55,17 +55,30 @@ export async function POST(req: NextRequest) {
   };
 
   if (massRetry) {
-    const failedLogs = await prisma.miningLog.findMany({
-      where: {
-        OR: [
-          { status: { in: ["empty", "failed", "aborted"] } },
-          { codesFound: 0, status: { not: "skipped" } },
-        ],
-      },
-      select: { brand: true },
+    const allLogs = await prisma.miningLog.findMany({
+      select: { brand: true, manual: true, status: true, codesFound: true },
     });
 
-    const uniqueBrands = [...new Set(failedLogs.map((l) => l.brand))];
+    const succeededManuals = new Set(
+      allLogs
+        .filter((l) => l.status === "success")
+        .map((l) => `${l.brand}::${l.manual}`)
+    );
+
+    const failedBrands = new Set(
+      allLogs
+        .filter(
+          (l) =>
+            (l.status === "empty" ||
+              l.status === "failed" ||
+              l.status === "aborted" ||
+              (l.codesFound === 0 && l.status !== "skipped")) &&
+            !succeededManuals.has(`${l.brand}::${l.manual}`)
+        )
+        .map((l) => l.brand)
+    );
+
+    const uniqueBrands = [...failedBrands];
 
     const alreadyQueued = await prisma.miningQueue.findMany({
       where: {
@@ -85,7 +98,7 @@ export async function POST(req: NextRequest) {
     if (toQueue.length === 0) {
       return NextResponse.json({
         queued: 0,
-        message: "All failed brands are already in the queue.",
+        message: "All failed brands are already in the queue or already succeeded.",
       });
     }
 
