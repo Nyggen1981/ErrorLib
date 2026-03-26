@@ -78,6 +78,14 @@ export default async function FaultCodePage({ params }: Props) {
   const manualCodesCount = fault.manual._count.faultCodes;
   const manualCodesHref = `/${fault.manual.brand.slug}/${fault.manual.slug}`;
 
+  const relatedCodes = await prisma.faultCode.findMany({
+    where: { manualId: fault.manualId, id: { not: fault.id } },
+    select: { code: true, title: true, slug: true },
+    take: 20,
+  });
+  // Shuffle and pick 3 for variety on each page load
+  const shuffled = relatedCodes.sort(() => Math.random() - 0.5).slice(0, 3);
+
   const englishContent = {
     title: fault.title,
     description: fault.description,
@@ -272,6 +280,31 @@ export default async function FaultCodePage({ params }: Props) {
           </div>
 
           <AdSlot slot="content" />
+
+          {/* Related Faults */}
+          {shuffled.length > 0 && (
+            <section className="mb-5">
+              <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-technical-400">
+                {t("relatedFaults", locale)}
+              </h2>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {shuffled.map((related) => (
+                  <a
+                    key={related.slug}
+                    href={`/${brandSlug}/${manualSlug}/${related.slug}`}
+                    className="group flex items-center gap-3 rounded-lg border border-technical-700 bg-technical-800 p-3 transition-all hover:border-technical-500 hover:bg-technical-700"
+                  >
+                    <span className="shrink-0 rounded bg-accent/15 px-2 py-1 font-mono text-xs font-bold text-accent transition group-hover:bg-accent/25">
+                      {related.code}
+                    </span>
+                    <span className="min-w-0 truncate text-sm text-technical-200 transition group-hover:text-white">
+                      {related.title}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Source Details */}
           <div className="mt-5 rounded-lg border border-technical-700 bg-technical-800 p-4">

@@ -131,6 +131,12 @@ const dict = {
     de: "Verifizierte technische Daten. Zuletzt aktualisiert:",
     es: "Datos técnicos verificados. Última actualización:",
   },
+  relatedFaults: {
+    en: "Related Faults",
+    no: "Relaterte feilkoder",
+    de: "Verwandte Fehlercodes",
+    es: "Fallas relacionadas",
+  },
   translating: { en: "Translating...", no: "Oversetter...", de: "Übersetzen...", es: "Traduciendo..." },
 
   // ─── Brand page ───
