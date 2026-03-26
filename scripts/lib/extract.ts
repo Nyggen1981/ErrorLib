@@ -96,24 +96,22 @@ For each code, return:
 - "title": Short human-readable title (e.g. "Overcurrent", "DC Bus Overvoltage")
 - "description": 2-4 sentences explaining the root cause, affected component, and risk. Include specific technical details: parameter numbers (e.g. "Parameter 99.06"), terminal names (e.g. "DI1", "X1:3"), and threshold values (e.g. "voltage >415V") when available in the source text.
 - "causes": Array of 3-5 strings explaining WHY this fault typically occurs (e.g. "Motor cable insulation breakdown due to aging or mechanical damage", "Supply voltage sag below 340V during heavy load transients"). Be specific to this equipment, not generic. Include parameter numbers where relevant (e.g. "Parameter P1-54 set below motor rated torque").
-- "fixSteps": Array of 3-6 specific troubleshooting steps ordered by priority.
+- "fixSteps": Array of 3-6 troubleshooting steps ordered by priority (MANDATORY — see below).
 - "sourcePage": The PDF page number where this fault code is primarily documented. Use the page number shown in the "--- Page X ---" header.
 
-MANDATORY RULES FOR fixSteps:
-1. Every step MUST reference something physically verifiable: a measurement, a parameter value, a terminal, a connection, a setting, or a DIP-switch position.
-2. BANNED generic phrases (NEVER use these unless they are verbatim numbered steps from the manual):
-   - "check wiring", "check connections", "inspect wiring"
-   - "allow motor to cool", "allow to cool down"
-   - "consult manufacturer", "refer to manual", "contact support"
-   - "replace if necessary", "repair or replace"
-   - "ensure proper ventilation"
-3. GOOD step examples:
-   - "Measure insulation resistance between motor phases U-V, V-W, U-W using a megger at 500VDC — expect >1 MΩ"
-   - "Check parameter 30.01 (Motor Nominal Current) — verify it matches the motor nameplate FLA value"
-   - "Measure DC bus voltage at terminals +UDC/-UDC — expect 540-750VDC for 400V input"
-   - "Verify DI1 run command signal at terminal X1:1 — expect 24VDC when run is active"
-4. If the manual lists specific parameter numbers, voltage/resistance values, or terminal designations for a fix, you MUST include them.
-5. If the source text provides no actionable fix data for a code beyond generic advice, return fewer steps rather than padding with generics.
+MANDATORY FIELD — fixSteps (never empty):
+- You MUST return a non-empty "fixSteps" array for every code: minimum 3 items, target 3-6. Never output [] or omit fixSteps.
+- If the manual lists explicit numbered troubleshooting steps, use and adapt them. If explicit steps are missing or incomplete, derive logical diagnostic steps from the "causes" you listed for that same code — each step should map to verifying or ruling out those causes.
+- Safety first: prioritize non-destructive checks a field technician can perform: verify wiring and terminations, measure voltage/current at defined points, check and compare drive/controller parameters against the manual or nameplate, inspect for mechanical blockage or binding, test motor or cable insulation where applicable. Use professional, active phrasing: "Verify...", "Inspect...", "Measure...", "Test...".
+- Do not guess internal component-level repairs (e.g. replacing a specific PCB or semiconductor) unless the source text explicitly instructs it. Focus on what can be checked externally, by measurement, or through the controller/HMI/parameter interface.
+- Consistency: if a cause involves overcurrent or short-circuit risk, include a step such as: "Check motor windings and power cables for short circuits or ground faults using appropriate continuity and insulation tests." If causes mention incorrect parameters, include verifying those parameters against nameplate and application data.
+- Every step MUST still name something verifiable: a measurement, parameter, terminal, connection, setting, or DIP-switch position when the manual provides them. If the manual gives specific parameter numbers, voltages, resistances, or terminal IDs for a fix, you MUST include them in the relevant steps.
+- Avoid hollow placeholders as the only content: do not use "consult manufacturer", "refer to manual", "contact support", or "replace if necessary" as standalone steps. Do not use "allow motor to cool" as the sole step unless the manual states it as the primary remedy.
+- GOOD step examples:
+   - "Measure insulation resistance between motor phases U-V, V-W, U-W with a megger at 500VDC — expect >1 MΩ"
+   - "Verify parameter 30.01 (Motor Nominal Current) matches the motor nameplate FLA"
+   - "Measure DC bus voltage at +UDC/-UDC — expect 540-750VDC for 400V class supply"
+   - "Verify run command at DI1 / terminal X1:1 — expect 24VDC when run is active"
 
 TEXT FORMATTING RULES (apply to ALL string fields):
 1. Parameters: Write as a single unbroken token — "P1-54" NOT "P1 -54" or "P1- 54". No spaces between prefix, hyphen, and number.
@@ -124,7 +122,7 @@ TEXT FORMATTING RULES (apply to ALL string fields):
 Strict filtering:
 - Only extract ACTUAL fault/error/alarm codes. Ignore page numbers, chapter numbers, part numbers, or marketing text.
 - Deduplicate: if the same code appears on multiple pages, merge all information into one entry.
-- If a code has NEITHER description NOR fixSteps, discard it.
+- Discard any code that is missing "fixSteps" or has an empty fixSteps array.
 - If no fault codes exist in the text, return: { "codes": [] }
 - Return ONLY valid JSON. No markdown fences, no commentary.
 
@@ -208,6 +206,7 @@ function filterAndCap(codes: ExtractedCode[], max: number): ExtractedCode[] {
     if (!fc.code || !fc.title) return false;
     const hasDesc = fc.description && fc.description.length > 5;
     const hasSteps = Array.isArray(fc.fixSteps) && fc.fixSteps.length > 0;
+    if (!hasSteps) return false;
     return hasDesc || hasSteps;
   });
 
@@ -233,6 +232,15 @@ const MAX_CODES_PER_MANUAL = 60;
 const RATE_LIMIT_GAP_MS = 35_000;
 
 const MAX_PDF_BYTES_PER_CHUNK = 15 * 1024 * 1024;
+
+/** After this many consecutive 0-code chunks, stop scanning the rest (saves time on huge PDFs). 0 = never stop early. */
+function getOcrConsecutiveEmptyChunkLimit(): number {
+  const raw = process.env.PDF_OCR_MAX_CONSECUTIVE_EMPTY_CHUNKS;
+  if (raw === undefined || raw === "") return 15;
+  const n = parseInt(raw, 10);
+  if (Number.isNaN(n) || n < 0) return 15;
+  return n;
+}
 
 async function callGeminiPdf(
   pdfBase64: string,
@@ -323,6 +331,9 @@ export async function extractWithOcr(
         `[PDF-OCR] Splitting large PDF (${sizeMB} MB) into ${chunks.length} chunks for processing`
       );
 
+      const emptyStreakLimit = getOcrConsecutiveEmptyChunkLimit();
+      let consecutiveEmptyChunks = 0;
+
       for (let i = 0; i < chunks.length; i++) {
         const chunkMB = (chunks[i].length / 1024 / 1024).toFixed(1);
         log.info(
@@ -345,12 +356,24 @@ export async function extractWithOcr(
         try {
           const result = await callGeminiPdf(chunks[i].toString("base64"));
           if (result.codes.length > 0) {
+            consecutiveEmptyChunks = 0;
             log.success(
               `  [PDF-OCR] Chunk ${i + 1}: ${result.codes.length} codes found`
             );
             allCodes.push(...result.codes);
           } else {
+            consecutiveEmptyChunks++;
             log.detail(`  [PDF-OCR] Chunk ${i + 1}: no codes found`);
+            if (
+              emptyStreakLimit > 0 &&
+              consecutiveEmptyChunks >= emptyStreakLimit
+            ) {
+              const skipped = chunks.length - i - 1;
+              log.warn(
+                `  [PDF-OCR] Stopping early after ${emptyStreakLimit} consecutive chunks with no codes (${skipped} chunk(s) not scanned). Set PDF_OCR_MAX_CONSECUTIVE_EMPTY_CHUNKS=0 to scan the whole PDF.`
+              );
+              break;
+            }
           }
         } catch (err) {
           log.warn(

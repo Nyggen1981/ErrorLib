@@ -51,8 +51,13 @@ function stripLeadingNoise(s: string): string {
 
 export function washManualTitle(raw: string): string {
   let s = stripLeadingNoise(raw.trim());
+  // Common UTF-8 mojibake for Greek letters (e.g. Fanuc αi in PDFs)
+  s = s.replace(/╬▒/g, "Alpha").replace(/╬▓/g, "Beta");
   for (const [re, rep] of GREEK_TO_LATIN) {
     s = s.replace(re, rep);
   }
+  // Fanuc-style "αi" / "βi" product lines → spaced Latin (after single-letter Greek → word replace)
+  s = s.replace(/\bAlphai\b/gi, "Alpha i");
+  s = s.replace(/\bBetai\b/gi, "Beta i");
   return s.trim();
 }

@@ -124,6 +124,14 @@ export function extractSeries(manualName: string, brandName: string): string {
     )
     .trim();
 
+  const brandNorm = brandName.trim();
+  if (/^huawei$/i.test(brandNorm) && /\bSUN2000\b/i.test(stripped)) {
+    return "SUN2000 Series";
+  }
+  if (/^sma$/i.test(brandNorm) && /\bSunny\s+Boy\b/i.test(stripped)) {
+    return "Sunny Boy Series";
+  }
+
   for (const [pattern, extract] of SERIES_PATTERNS) {
     const match = stripped.match(pattern);
     if (match) return extract(match);
