@@ -8,7 +8,7 @@ function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
-function getRetryableBrands(
+async function getRetryableBrands(
   allLogs: { brand: string; manual: string; status: string; codesFound: number }[]
 ) {
   const succeededManuals = new Set(
@@ -31,9 +31,26 @@ function getRetryableBrands(
     }
   }
 
-  // A manual is retryable only if: no success AND fewer than MAX_ATTEMPTS failures
+  // Brands that have already been force-retried via the queue count as exhausted
+  const previousRetries = await prisma.miningQueue.findMany({
+    where: { targetManuals: { has: "__FORCE_RETRY__" }, status: "completed" },
+    select: { brandName: true },
+  });
+  const alreadyRetried = new Set(
+    previousRetries.map((q) => q.brandName.toLowerCase())
+  );
+
+  // A manual is retryable only if: no success, fewer than MAX_ATTEMPTS failures,
+  // AND the brand hasn't already been force-retried via the queue
   const retryableManuals = [...attemptCounts.entries()].filter(
-    ([key, count]) => !succeededManuals.has(key) && count < MAX_ATTEMPTS
+    ([key, count]) => {
+      const brand = key.split("::")[0];
+      return (
+        !succeededManuals.has(key) &&
+        count < MAX_ATTEMPTS &&
+        !alreadyRetried.has(brand.toLowerCase())
+      );
+    }
   );
 
   return [...new Set(retryableManuals.map(([key]) => key.split("::")[0]))];
@@ -47,7 +64,7 @@ export async function GET() {
     select: { brand: true, manual: true, status: true, codesFound: true },
   });
 
-  const uniqueBrands = getRetryableBrands(allLogs);
+  const uniqueBrands = await getRetryableBrands(allLogs);
 
   const alreadyQueued = await prisma.miningQueue.findMany({
     where: {
@@ -85,7 +102,7 @@ export async function POST(req: NextRequest) {
       select: { brand: true, manual: true, status: true, codesFound: true },
     });
 
-    const uniqueBrands = getRetryableBrands(allLogs);
+    const uniqueBrands = await getRetryableBrands(allLogs);
 
     const alreadyQueued = await prisma.miningQueue.findMany({
       where: {
