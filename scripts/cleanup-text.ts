@@ -97,7 +97,6 @@ async function main() {
   for (const fc of codes) {
     const newDesc = sanitize(fc.description);
     const newCauses = sanitizeArray(fc.causes);
-    const newTools = sanitizeArray(fc.requiredTools);
     const newSteps = sanitizeArray(fc.fixSteps);
     const newTitle = sanitize(fc.title);
 
@@ -105,7 +104,6 @@ async function main() {
       newDesc !== fc.description ||
       newTitle !== fc.title ||
       JSON.stringify(newCauses) !== JSON.stringify(fc.causes) ||
-      JSON.stringify(newTools) !== JSON.stringify(fc.requiredTools) ||
       JSON.stringify(newSteps) !== JSON.stringify(fc.fixSteps);
 
     if (!changed) {
@@ -134,7 +132,6 @@ async function main() {
           title: newTitle,
           description: newDesc,
           causes: newCauses,
-          requiredTools: newTools,
           fixSteps: newSteps,
           translations: {},
         },

@@ -117,33 +117,6 @@ export function TranslatedCauses({ heading }: { heading: string }) {
   );
 }
 
-export function TranslatedTools({ heading }: { heading: string }) {
-  const { content } = useTranslation();
-  const tools = content.requiredTools;
-  if (!tools || tools.length === 0) return null;
-
-  return (
-    <section className="mb-5 rounded-lg border border-technical-700 bg-technical-800 p-5 sm:p-6">
-      <div className="mb-3 flex items-center gap-2">
-        <svg className="h-4.5 w-4.5 text-technical-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17l-5.1 5.1a2.12 2.12 0 01-3-3l5.1-5.1m0 0L15.17 4.42a2.12 2.12 0 013 0l1.41 1.41a2.12 2.12 0 010 3l-7.75 7.75m-4.41-4.41L4.83 15.17" />
-        </svg>
-        <h2 className="text-lg font-bold text-technical-50">{heading}</h2>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {tools.map((tool, i) => (
-          <span
-            key={i}
-            className="inline-flex items-center gap-1.5 rounded-md border border-technical-600 bg-technical-900/50 px-3 py-1.5 text-xs font-medium text-technical-200"
-          >
-            {tool}
-          </span>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 export function TranslatingBanner({ label }: { label: string }) {
   const { loading } = useTranslation();
   if (!loading) return null;

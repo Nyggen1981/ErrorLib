@@ -40,7 +40,6 @@ model FaultCode {
   title        String
   description   String
   causes        String[]
-  requiredTools String[]
   fixSteps      String[]
   sourceUrl     String?
   sourcePage   Int?

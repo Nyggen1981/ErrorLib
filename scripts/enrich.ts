@@ -14,8 +14,7 @@ CRITICAL: You MUST return the "ref" number EXACTLY as provided for each entry. T
 
 For each fault code provided, return:
 - "ref": The numeric reference ID (MUST match the input ref exactly — this is mandatory)
-- "causes": Array of 3-5 strings explaining WHY this fault typically occurs. Be specific to industrial automation equipment. Examples: "Motor cable insulation breakdown due to aging or mechanical damage", "Supply voltage sag below 340V during heavy load transients", "Encoder feedback cable shielding fault causing signal noise".
-- "requiredTools": Array of 1-4 tools a technician needs. Examples: "Multimeter (AC/DC voltage + resistance)", "Megohmmeter 500VDC", "Laptop with manufacturer software", "Oscilloscope for signal analysis". Only list tools relevant to diagnosing this specific fault.
+- "causes": Array of 3-5 strings explaining WHY this fault typically occurs. Be specific to industrial automation equipment. Include parameter numbers where relevant (e.g. "Parameter P1-54 set below motor rated torque"). Examples: "Motor cable insulation breakdown due to aging or mechanical damage", "Supply voltage sag below 340V during heavy load transients", "Encoder feedback cable shielding fault causing signal noise".
 - "fixSteps": Array of 3-6 detailed, numbered repair steps. Every step MUST reference a specific measurement, parameter, terminal, or verifiable action. BANNED: "check wiring", "consult manual", "replace if necessary", "ensure proper ventilation".
 
 TEXT FORMATTING RULES (apply to ALL string fields):
@@ -27,7 +26,7 @@ TEXT FORMATTING RULES (apply to ALL string fields):
 If you cannot produce specific causes/tools for a code, return shorter arrays rather than padding with generic content.
 
 Return ONLY valid JSON. No markdown fences, no commentary.
-Output: { "codes": [{ "ref": 1, "causes": ["..."], "requiredTools": ["..."], "fixSteps": ["..."] }] }`;
+Output: { "codes": [{ "ref": 1, "causes": ["..."], "fixSteps": ["..."] }] }`;
 
 const BATCH_SIZE = 15;
 const RATE_GAP_MS = 35_000;
@@ -37,7 +36,7 @@ function sleep(ms: number) {
 }
 
 type EnrichInput = { ref: number; code: string; title: string; description: string };
-type EnrichOutput = { ref: number; causes: string[]; requiredTools: string[]; fixSteps: string[] };
+type EnrichOutput = { ref: number; causes: string[]; fixSteps: string[] };
 
 async function callGemini(
   codesContext: EnrichInput[],
@@ -60,7 +59,6 @@ async function callGemini(
       return (parsed.codes || []).map((c: Record<string, unknown>) => ({
         ref: Number(c.ref),
         causes: c.causes || [],
-        requiredTools: c.requiredTools || [],
         fixSteps: c.fixSteps || [],
       }));
     } catch (err) {
@@ -99,8 +97,6 @@ async function main() {
     where.OR = [
       { causes: { equals: [] } },
       { causes: { isEmpty: true } },
-      { requiredTools: { equals: [] } },
-      { requiredTools: { isEmpty: true } },
     ];
   }
 
@@ -188,7 +184,7 @@ async function main() {
           }
 
           if (dryRun) {
-            console.log(`    [DRY] ${fc.code}: ${data.causes?.length || 0} causes, ${data.requiredTools?.length || 0} tools, ${data.fixSteps?.length || 0} steps`);
+            console.log(`    [DRY] ${fc.code}: ${data.causes?.length || 0} causes, ${data.fixSteps?.length || 0} steps`);
             totalEnriched++;
             continue;
           }
@@ -196,7 +192,6 @@ async function main() {
           try {
             const update: Record<string, unknown> = {};
             if (data.causes?.length > 0) update.causes = data.causes;
-            if (data.requiredTools?.length > 0) update.requiredTools = data.requiredTools;
             if (data.fixSteps?.length > 0) update.fixSteps = data.fixSteps;
             if (Object.keys(update).length > 0) {
               update.translations = {};

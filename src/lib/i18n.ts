@@ -125,12 +125,6 @@ const dict = {
     de: "Häufige Ursachen",
     es: "Causas comunes",
   },
-  requiredTools: {
-    en: "Required Tools",
-    no: "Nødvendig verktøy",
-    de: "Benötigtes Werkzeug",
-    es: "Herramientas necesarias",
-  },
   verifiedData: {
     en: "Verified technical data. Last updated:",
     no: "Verifisert teknisk data. Sist oppdatert:",

@@ -64,8 +64,7 @@ export async function upsertFaultCode(
   fixSteps: string[],
   sourceUrl?: string,
   sourcePage?: number,
-  causes?: string[],
-  requiredTools?: string[]
+  causes?: string[]
 ) {
   const prisma = getPrisma();
 
@@ -83,7 +82,6 @@ export async function upsertFaultCode(
         ...(sourceUrl && { sourceUrl }),
         ...(sourcePage != null && { sourcePage }),
         ...(causes && causes.length > 0 && { causes }),
-        ...(requiredTools && requiredTools.length > 0 && { requiredTools }),
       },
     });
   }
@@ -105,7 +103,6 @@ export async function upsertFaultCode(
           sourceUrl,
           sourcePage,
           ...(causes && causes.length > 0 && { causes }),
-          ...(requiredTools && requiredTools.length > 0 && { requiredTools }),
         },
       });
     } catch (err) {
@@ -125,7 +122,6 @@ export async function enrichFaultCode(
   code: string,
   data: {
     causes?: string[];
-    requiredTools?: string[];
     fixSteps?: string[];
     description?: string;
     sourcePage?: number;
@@ -139,7 +135,6 @@ export async function enrichFaultCode(
 
   const update: Record<string, unknown> = {};
   if (data.causes && data.causes.length > 0) update.causes = data.causes;
-  if (data.requiredTools && data.requiredTools.length > 0) update.requiredTools = data.requiredTools;
   if (data.fixSteps && data.fixSteps.length > 0) update.fixSteps = data.fixSteps;
   if (data.description && data.description.length > existing.description.length) update.description = data.description;
   if (data.sourcePage != null && !existing.sourcePage) update.sourcePage = data.sourcePage;
@@ -185,7 +180,6 @@ type QueueItem = {
   sourceUrl?: string;
   sourcePage?: number;
   causes?: string[];
-  requiredTools?: string[];
 };
 
 let _queue: QueueItem[] = [];
@@ -213,8 +207,7 @@ export async function flushDbQueue(): Promise<number> {
           item.fixSteps,
           item.sourceUrl,
           item.sourcePage,
-          item.causes,
-          item.requiredTools
+          item.causes
         );
         saved++;
       } catch (err) {

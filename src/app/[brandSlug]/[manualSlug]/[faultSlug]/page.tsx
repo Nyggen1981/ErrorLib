@@ -7,7 +7,6 @@ import {
   TranslatedDescription,
   TranslatedAllSteps,
   TranslatedCauses,
-  TranslatedTools,
   TranslatingBanner,
 } from "@/components/FaultCodeContent";
 import { AdSlot } from "@/components/AdSlot";
@@ -84,7 +83,6 @@ export default async function FaultCodePage({ params }: Props) {
     description: fault.description,
     fixSteps: fault.fixSteps,
     causes: fault.causes,
-    requiredTools: fault.requiredTools,
   };
 
   const translations = (fault.translations as Record<string, typeof englishContent>) ?? {};
@@ -228,9 +226,6 @@ export default async function FaultCodePage({ params }: Props) {
 
           {/* Causes */}
           <TranslatedCauses heading={t("commonCauses", locale)} />
-
-          {/* Required Tools */}
-          <TranslatedTools heading={t("requiredTools", locale)} />
 
           {/* All Steps */}
           <section className="mb-5 rounded-lg border border-technical-700 bg-technical-800 p-5 sm:p-6">
