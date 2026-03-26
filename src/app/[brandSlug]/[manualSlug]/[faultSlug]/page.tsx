@@ -5,10 +5,7 @@ import { TranslatedContent } from "@/components/TranslatedContent";
 import {
   TranslatedTitle,
   TranslatedDescription,
-  TranslatedPrioritySteps,
-  TranslatedMoreSteps,
-  TranslatedFullSteps,
-  HasFullSteps,
+  TranslatedAllSteps,
   TranslatingBanner,
 } from "@/components/FaultCodeContent";
 import { AdSlot } from "@/components/AdSlot";
@@ -127,127 +124,68 @@ export default async function FaultCodePage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
       />
-      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-6">
-      <TranslatedContent
-      faultCodeId={fault.id}
-      locale={locale}
-      fallback={englishContent}
-      cached={cachedTranslation}
-    >
-      <Breadcrumbs
-        items={[
-          { label: t("home", locale), href: "/" },
-          {
-            label: fault.manual.brand.name,
-            href: `/${fault.manual.brand.slug}`,
-          },
-          {
-            label: displayName,
-            href: `/${fault.manual.brand.slug}/${fault.manual.slug}`,
-          },
-          { label: fault.code },
-        ]}
-      />
+      <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6 sm:py-6">
+        <TranslatedContent
+          faultCodeId={fault.id}
+          locale={locale}
+          fallback={englishContent}
+          cached={cachedTranslation}
+        >
+          <Breadcrumbs
+            items={[
+              { label: t("home", locale), href: "/" },
+              {
+                label: fault.manual.brand.name,
+                href: `/${fault.manual.brand.slug}`,
+              },
+              {
+                label: displayName,
+                href: `/${fault.manual.brand.slug}/${fault.manual.slug}`,
+              },
+              { label: fault.code },
+            ]}
+          />
 
-      <TranslatingBanner label={t("translating", locale)} />
+          <TranslatingBanner label={t("translating", locale)} />
 
-      {/* Compressed Hero */}
-      <section className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
-        <div className="flex shrink-0 items-center justify-center rounded-lg bg-accent/15 px-4 py-3 sm:px-5 sm:py-4">
-          <span
-            className={`whitespace-nowrap font-mono font-bold text-accent ${
-              fault.code.length > 8
-                ? "text-lg sm:text-xl"
-                : fault.code.length > 5
-                  ? "text-xl sm:text-2xl"
-                  : "text-2xl sm:text-3xl"
-            }`}
-          >
-            {fault.code}
-          </span>
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold tracking-tight text-technical-50 sm:text-2xl">
-            <TranslatedTitle />
-          </h1>
-          <p className="mt-0.5 text-xs text-technical-400">
-            {fault.manual.brand.name} &middot; {displayName}
-          </p>
-        </div>
-      </section>
-
-      <div className="grid gap-5 lg:grid-cols-3">
-        {/* Quick Action Card */}
-        <aside className="lg:col-span-1">
-          <div className="sticky top-4 rounded-lg border border-accent/40 bg-technical-800 p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <svg
-                className="h-4 w-4 text-accent"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
+          {/* Hero */}
+          <section className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+            <div className="flex shrink-0 items-center justify-center rounded-lg bg-accent/15 px-4 py-3 sm:px-5 sm:py-4">
+              <span
+                className={`whitespace-nowrap font-mono font-bold text-accent ${
+                  fault.code.length > 8
+                    ? "text-lg sm:text-xl"
+                    : fault.code.length > 5
+                      ? "text-xl sm:text-2xl"
+                      : "text-2xl sm:text-3xl"
+                }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"
-                />
-              </svg>
-              <h2 className="text-base font-bold text-accent">
-                {t("priorityFix", locale)}
-              </h2>
+                {fault.code}
+              </span>
             </div>
-            <p className="mb-3 text-xs text-technical-400">
-              {t("priorityFixSubtitle", locale)}
-            </p>
-            <TranslatedPrioritySteps />
-            <TranslatedMoreSteps label={t("moreStepsBelow", locale)} />
-          </div>
-          <AdSlot slot="sidebar" className="mt-4" />
-        </aside>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold tracking-tight text-technical-50 sm:text-2xl">
+                <TranslatedTitle />
+              </h1>
+              <p className="mt-0.5 text-xs text-technical-400">
+                {fault.manual.brand.name} &middot; {displayName}
+              </p>
+            </div>
+          </section>
 
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-5">
-          <section className="rounded-lg border border-technical-700 bg-technical-800 p-5 sm:p-6">
+          {/* Description */}
+          <section className="mb-5 rounded-lg border border-technical-700 bg-technical-800 p-5 sm:p-6">
             <h2 className="mb-3 text-lg font-bold text-technical-50">
               {t("whatDoesMean", locale)} {fault.code} {t("mean", locale)}
             </h2>
             <TranslatedDescription />
           </section>
 
-          <HasFullSteps>
-            <section className="rounded-lg border border-technical-700 bg-technical-800 p-5 sm:p-6">
-              <h2 className="mb-1 text-lg font-bold text-technical-50">
-                {t("completeGuide", locale)}
-              </h2>
-              <p className="mb-4 text-xs text-technical-400">
-                {t("stepsInPriorityFix", locale)}
-              </p>
-              <TranslatedFullSteps />
-            </section>
-          </HasFullSteps>
-
-          <AdSlot slot="content" />
-        </div>
-      </div>
-
-      {/* Source Details */}
-      <div className="mt-6 rounded-lg border border-technical-700 bg-technical-800 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-xs text-technical-400">
-            <span className="font-medium text-technical-200">{t("sourceManual", locale)}</span>
-            {" "}{fault.manual.name}
-          </div>
-          {(fault.sourceUrl || fault.manual.pdfUrl) && !fault.manual.isBroken ? (
-            <a
-              href={fault.sourceUrl || fault.manual.pdfUrl!}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/25"
-            >
+          {/* All Steps */}
+          <section className="mb-5 rounded-lg border border-technical-700 bg-technical-800 p-5 sm:p-6">
+            <div className="mb-4 flex items-center gap-2">
               <svg
-                className="h-3.5 w-3.5"
+                className="h-4.5 w-4.5 text-accent"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth={2}
@@ -256,22 +194,59 @@ export default async function FaultCodePage({ params }: Props) {
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                  d="M11.42 15.17l-5.1-3.07a1 1 0 01-.42-.82V5.58a1 1 0 01.42-.82l5.1-3.07a1 1 0 011.16 0l5.1 3.07a1 1 0 01.42.82v5.7a1 1 0 01-.42.82l-5.1 3.07a1 1 0 01-1.16 0z"
                 />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 22v-6" />
               </svg>
-              {fault.sourcePage
-                ? `Open Manual (Page ${fault.sourcePage})`
-                : t("viewOfficialPDF", locale)}
-            </a>
-          ) : fault.manual.isBroken ? (
-            <span className="text-[10px] text-technical-400">
-              {t("sourceUnderMaintenance", locale)}
-            </span>
-          ) : null}
-        </div>
+              <h2 className="text-lg font-bold text-technical-50">
+                {t("repairSteps", locale)}
+              </h2>
+            </div>
+            <TranslatedAllSteps />
+          </section>
+
+          <AdSlot slot="content" />
+
+          {/* Source Details */}
+          <div className="mt-5 rounded-lg border border-technical-700 bg-technical-800 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-technical-400">
+                <span className="font-medium text-technical-200">{t("sourceManual", locale)}</span>
+                {" "}{fault.manual.name}
+              </div>
+              {(fault.sourceUrl || fault.manual.pdfUrl) && !fault.manual.isBroken ? (
+                <a
+                  href={fault.sourceUrl || fault.manual.pdfUrl!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/25"
+                >
+                  <svg
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                    />
+                  </svg>
+                  {fault.sourcePage
+                    ? `Open Manual (Page ${fault.sourcePage})`
+                    : t("viewOfficialPDF", locale)}
+                </a>
+              ) : fault.manual.isBroken ? (
+                <span className="text-[10px] text-technical-400">
+                  {t("sourceUnderMaintenance", locale)}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </TranslatedContent>
       </div>
-    </TranslatedContent>
-    </div>
     </>
   );
 }

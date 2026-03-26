@@ -96,27 +96,13 @@ const dict = {
   somethingWrong: { en: "Something went wrong. Please try again.", no: "Noe gikk galt. Prøv igjen.", de: "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.", es: "Algo salió mal. Por favor, inténtelo de nuevo." },
 
   // ─── Fault code detail page ───
-  priorityFix: { en: "Priority Fix", no: "Prioritert fiks", de: "Prioritäts-Fix", es: "Solución prioritaria" },
-  priorityFixSubtitle: {
-    en: "Start with these steps to resolve the issue quickly:",
-    no: "Start med disse trinnene for å løse problemet raskt:",
-    de: "Beginnen Sie mit diesen Schritten, um das Problem schnell zu beheben:",
-    es: "Comience con estos pasos para resolver el problema rápidamente:",
-  },
-  moreStepsBelow: { en: "more steps below", no: "flere trinn nedenfor", de: "weitere Schritte unten", es: "más pasos abajo" },
   whatDoesMean: { en: "What does", no: "Hva betyr", de: "Was bedeutet", es: "¿Qué significa" },
   mean: { en: "mean?", no: "?", de: "?", es: "?" },
-  completeGuide: {
-    en: "Additional Steps",
-    no: "Ytterligere steg",
-    de: "Weitere Schritte",
-    es: "Pasos adicionales",
-  },
-  stepsInPriorityFix: {
-    en: "Steps 1–2 are listed in Priority Fix.",
-    no: "Steg 1–2 er listet under Prioritert fiks.",
-    de: "Schritte 1–2 sind unter Prioritäts-Fix aufgeführt.",
-    es: "Los pasos 1–2 están en Solución prioritaria.",
+  repairSteps: {
+    en: "Repair Steps",
+    no: "Reparasjonssteg",
+    de: "Reparaturschritte",
+    es: "Pasos de reparación",
   },
   sourceManual: { en: "Source:", no: "Kilde:", de: "Quelle:", es: "Fuente:" },
   viewOfficialPDF: { en: "View Official PDF", no: "Åpne offisiell PDF", de: "Offizielles PDF öffnen", es: "Ver PDF oficial" },

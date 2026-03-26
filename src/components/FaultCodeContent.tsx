@@ -21,8 +21,6 @@ function boldTechnicalTerms(text: string): React.ReactNode[] {
   return parts;
 }
 
-const PRIORITY_COUNT = 2;
-
 export function TranslatedTitle() {
   const { content } = useTranslation();
   return <>{content.title}</>;
@@ -37,49 +35,18 @@ export function TranslatedDescription() {
   );
 }
 
-export function TranslatedPrioritySteps() {
+export function TranslatedAllSteps() {
   const { content } = useTranslation();
-  const steps = content.fixSteps.slice(0, PRIORITY_COUNT);
-  return (
-    <ol className="space-y-2.5">
-      {steps.map((step, i) => (
-        <li key={i} className="flex items-start gap-2.5">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-accent text-[10px] font-bold text-technical-900">
-            {i + 1}
-          </span>
-          <span className="text-sm leading-snug text-technical-200">
-            {boldTechnicalTerms(step)}
-          </span>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-export function TranslatedMoreSteps({ label }: { label: string }) {
-  const { content } = useTranslation();
-  const remaining = content.fixSteps.length - PRIORITY_COUNT;
-  if (remaining <= 0) return null;
-  return (
-    <p className="mt-3 text-xs text-technical-400">
-      + {remaining} {label}
-    </p>
-  );
-}
-
-export function TranslatedFullSteps() {
-  const { content } = useTranslation();
-  const remaining = content.fixSteps.slice(PRIORITY_COUNT);
-  if (remaining.length === 0) return null;
+  if (content.fixSteps.length === 0) return null;
   return (
     <ol className="space-y-3">
-      {remaining.map((step, i) => (
+      {content.fixSteps.map((step, i) => (
         <li
           key={i}
           className="flex items-start gap-3 rounded-lg border border-technical-600 bg-technical-900/50 p-3"
         >
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-accent font-mono text-xs font-bold text-technical-900">
-            {i + PRIORITY_COUNT + 1}
+            {i + 1}
           </span>
           <p className="pt-0.5 text-sm leading-relaxed text-technical-200">
             {boldTechnicalTerms(step)}
@@ -88,12 +55,6 @@ export function TranslatedFullSteps() {
       ))}
     </ol>
   );
-}
-
-export function HasFullSteps({ children }: { children: React.ReactNode }) {
-  const { content } = useTranslation();
-  if (content.fixSteps.length <= PRIORITY_COUNT) return null;
-  return <>{children}</>;
 }
 
 export function TranslatingBanner({ label }: { label: string }) {
