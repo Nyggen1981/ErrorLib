@@ -7,38 +7,47 @@ type Props = {
 
 export function Footer({ locale }: Props) {
   return (
-    <footer className="border-t border-technical-700 bg-technical-800">
-      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
-        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-          <div className="order-2 flex flex-col md:order-1 md:min-w-0 md:flex-1">
-            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-technical-300 md:justify-start">
-              <span>{t("footerTitle", locale)}</span>
-              <span className="hidden text-technical-500 sm:inline">|</span>
+    <footer className="w-full border-t border-technical-700 bg-technical-800 py-10">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="flex flex-col items-center justify-center text-center gap-6">
+          <div className="flex flex-col items-center gap-2">
+            <nav
+              className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs text-technical-300"
+              aria-label="Footer"
+            >
               <a href="/about" className="transition hover:text-accent">
                 About
               </a>
+              <span className="text-technical-600" aria-hidden>
+                ·
+              </span>
               <a href="/privacy" className="transition hover:text-accent">
                 Privacy
               </a>
+              <span className="text-technical-600" aria-hidden>
+                ·
+              </span>
               <a href="/terms" className="transition hover:text-accent">
                 Terms
               </a>
-            </div>
-            <p className="mx-auto mt-2 max-w-3xl text-center text-[10px] leading-relaxed text-technical-400 md:mx-0 md:text-left">
-              {t("disclaimer", locale)}
+            </nav>
+            <p className="max-w-2xl text-xs text-technical-400">
+              {t("footerTitle", locale)}
             </p>
           </div>
 
-          <div className="order-1 flex justify-center md:order-2 md:flex-shrink-0 md:justify-end md:pt-0.5">
-            <a
-              href="https://buymeacoffee.com/errorlib"
-              target="_blank"
-              rel="noopener noreferrer sponsored"
-              className="inline-flex items-center justify-center rounded-md border border-technical-500 bg-technical-700 px-4 py-2 text-sm font-medium text-technical-100 shadow-sm transition hover:border-technical-400 hover:bg-technical-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-technical-400"
-            >
-              Buy me a coffee ☕️
-            </a>
-          </div>
+          <p className="max-w-2xl text-[10px] leading-relaxed text-technical-400">
+            {t("disclaimer", locale)}
+          </p>
+
+          <a
+            href="https://buymeacoffee.com/errorlib"
+            target="_blank"
+            rel="noopener noreferrer sponsored"
+            className="inline-flex items-center justify-center rounded-md border border-technical-500 bg-technical-700 px-4 py-2 text-sm font-medium text-technical-100 shadow-sm transition hover:border-technical-400 hover:bg-technical-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-technical-400"
+          >
+            Buy me a coffee ☕️
+          </a>
         </div>
       </div>
     </footer>
