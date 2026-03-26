@@ -25,16 +25,16 @@ const dict = {
 
   // ─── Homepage ───
   heroTitle: {
-    en: "Universal Industrial Fault Code Library",
-    no: "Universelt industrielt feilkodebibliotek",
-    de: "Universelle industrielle Fehlercodes-Bibliothek",
-    es: "Biblioteca universal de códigos de falla industriales",
+    en: "Industrial Fault Code Library",
+    no: "Industrielt feilkodebibliotek",
+    de: "Industrielle Fehlercodes-Bibliothek",
+    es: "Biblioteca de códigos de falla industriales",
   },
   heroSubtitle: {
-    en: "Instant troubleshooting and repair steps for PLCs, Drives, Robotics, and CNC systems.",
-    no: "Umiddelbar feilsøking og reparasjonssteg for PLSer, frekvensomformere, robotikk og CNC-systemer.",
-    de: "Sofortige Fehlerbehebung und Reparaturschritte für SPSen, Antriebe, Robotik und CNC-Systeme.",
-    es: "Solución de problemas y pasos de reparación instantáneos para PLCs, variadores, robótica y sistemas CNC.",
+    en: "Stop searching through PDFs. Get instant diagnostics and step-by-step repair guides for industrial automation, robotics, and CNC machinery.",
+    no: "Slutt å lete gjennom PDF-er. Få umiddelbar diagnostikk og trinnvise reparasjonsguider for industriell automasjon, robotikk og CNC-maskiner.",
+    de: "Schluss mit dem Durchsuchen von PDFs. Sofortige Diagnosen und Schritt-für-Schritt-Reparaturanleitungen für industrielle Automatisierung, Robotik und CNC-Maschinen.",
+    es: "Deja de buscar en PDFs. Obtén diagnósticos instantáneos y guías de reparación paso a paso para automatización industrial, robótica y maquinaria CNC.",
   },
   faultCodes: { en: "fault codes", no: "feilkoder", de: "Fehlercodes", es: "códigos de falla" },
   noBrandsYet: {
