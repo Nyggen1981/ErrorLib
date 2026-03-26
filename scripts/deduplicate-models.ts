@@ -31,22 +31,25 @@ async function findDuplicateGroups(
 
   const nameList = manuals.map((m) => `  - "${m.name}" (${m.codes} codes)`).join("\n");
 
-  const prompt = `You are an industrial equipment database administrator performing STRICT deduplication. Analyze these manual entries for "${brandName}" and find TRUE duplicates — manuals that clearly describe the SAME specific product and document type, just named differently.
+  const prompt = `You are an industrial equipment database administrator. We want ONE entry per physical product family. Analyze these manual entries for "${brandName}" and group manuals that cover the SAME product, even if they are different document types.
 
 MANUALS:
 ${nameList}
 
-STRICT RULES:
-1. ONLY group manuals that are CLEARLY the same product AND the same type of document. "ACS880 Firmware" and "ACS880 Primary Firmware" = same. "ACS880 Firmware" and "ACS880 Hardware Manual" = DIFFERENT (keep both).
-2. NEVER merge different model numbers: "PowerFlex 4" and "PowerFlex 40" are DIFFERENT products. "ACS880-31" and "ACS880-07" are DIFFERENT hardware variants. "FR-D700" and "FR-E500" are DIFFERENT.
-3. NEVER merge different document types that cover different technical content: "G120 Variable Speed Drive" vs "G120 Safety Functions" = DIFFERENT manuals (keep both).
-4. NEVER merge a parent series with a sub-model: "R-30iA/R-30iB Controller" and "R-30iB Mate" are DIFFERENT controllers.
-5. DO merge: formatting differences ("Series 30i" vs "30i Series"), capitalization ("αi series" vs "αi Series"), near-identical names ("VLT HVAC Drive FC 102" vs "VLT HVAC-FC 102"), and entries where one has 0 codes (empty duplicate from failed mining).
-6. DO merge: same model with slightly different name phrasing ("Danfoss VLT AutomationDrive FC 301/302" and "Danfoss FC302 AC Drives Programming Guide" if they cover the same product).
-7. For each group, pick the BEST canonical name — professional, properly capitalized, including the brand prefix.
+RULES:
+1. MERGE manuals for the SAME product regardless of document-type suffixes. Treat these suffixes as irrelevant when comparing product identity:
+   "Programming", "Maintenance", "Troubleshooting", "Technical Manual", "Instruction Manual", "User Manual", "Installation", "Quick Start", "Reference", "Parameter", "Hardware", "Firmware", "Software", "Application", "Guide", "Configuration".
+   Example: "F7 Drive" and "F7 Drive Programming" → MERGE into "F7 Drive".
+   Example: "GA500 Maintenance and Troubleshooting" and "GA500 AC Drive" → MERGE into "GA500 AC Drive".
+2. NEVER merge DIFFERENT model numbers: "PowerFlex 4" and "PowerFlex 40", "ACS880-31" and "ACS880-07", "FR-D700" and "FR-E500" are all DIFFERENT products.
+3. NEVER merge a parent series with a different sub-model: "R-30iA/R-30iB" and "R-30iB Mate" are DIFFERENT controllers.
+4. DO merge formatting/spelling variants: "Series 30i" vs "30i Series", "αi series" vs "αi Series".
+5. For the canonical name: use the shortest, cleanest product name WITHOUT document-type suffixes. Include the brand prefix.
+   Good: "${brandName} F7 Drive", "${brandName} GA500 AC Drive"
+   Bad: "${brandName} F7 Drive Programming", "${brandName} GA500 Maintenance and Troubleshooting"
 
 Return valid JSON array: [{ "canonical": "Best Name", "members": ["exact name 1", "exact name 2"] }]
-If no true duplicates found, return: []
+If no groups found, return: []
 Return ONLY the JSON.`;
 
   try {
