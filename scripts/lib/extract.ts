@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { PDFDocument } from "pdf-lib";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { log } from "./logger.js";
 import { enqueueFaultCode, flushDbQueue, queueSize } from "./db.js";
@@ -237,6 +238,29 @@ async function callGeminiPdf(
   return { codes: [] };
 }
 
+const PAGES_PER_SPLIT = 8;
+
+async function splitPdf(
+  pdfBytes: Buffer,
+  pagesPerChunk: number
+): Promise<Buffer[]> {
+  const srcDoc = await PDFDocument.load(pdfBytes);
+  const totalPages = srcDoc.getPageCount();
+  const chunks: Buffer[] = [];
+
+  for (let start = 0; start < totalPages; start += pagesPerChunk) {
+    const end = Math.min(start + pagesPerChunk, totalPages);
+    const newDoc = await PDFDocument.create();
+    const indices = Array.from({ length: end - start }, (_, i) => start + i);
+    const copiedPages = await newDoc.copyPages(srcDoc, indices);
+    for (const page of copiedPages) newDoc.addPage(page);
+    const bytes = await newDoc.save();
+    chunks.push(Buffer.from(bytes));
+  }
+
+  return chunks;
+}
+
 export async function extractWithOcr(
   pdfPath: string,
   manualId: string,
@@ -249,24 +273,65 @@ export async function extractWithOcr(
   const sizeMB = (pdfBuffer.length / 1024 / 1024).toFixed(1);
   log.info(`[PDF-OCR] File size: ${sizeMB} MB`);
 
-  if (pdfBuffer.length > MAX_PDF_BYTES_PER_CHUNK) {
-    log.warn(`[PDF-OCR] PDF is too large (${sizeMB} MB > 15 MB limit). Skipping.`);
-    return 0;
-  }
-
-  const pdfBase64 = pdfBuffer.toString("base64");
+  let allCodes: ExtractedCode[] = [];
 
   try {
-    const result = await callGeminiPdf(pdfBase64);
+    if (pdfBuffer.length <= MAX_PDF_BYTES_PER_CHUNK) {
+      const result = await callGeminiPdf(pdfBuffer.toString("base64"));
+      allCodes = result.codes;
+    } else {
+      const chunks = await splitPdf(pdfBuffer, PAGES_PER_SPLIT);
+      log.info(
+        `[PDF-OCR] Splitting large PDF (${sizeMB} MB) into ${chunks.length} chunks for processing`
+      );
 
-    if (result.codes.length === 0) {
+      for (let i = 0; i < chunks.length; i++) {
+        const chunkMB = (chunks[i].length / 1024 / 1024).toFixed(1);
+        log.info(
+          `[PDF-OCR] Chunk ${i + 1}/${chunks.length} (${chunkMB} MB)`
+        );
+
+        if (i > 0) {
+          log.detail(
+            `  [PDF-OCR] Rate-limit gap: flushing ${queueSize()} queued DB writes...`
+          );
+          const [flushed] = await Promise.all([
+            flushDbQueue(),
+            sleep(RATE_LIMIT_GAP_MS),
+          ]);
+          if (flushed > 0) {
+            log.detail(`  [PDF-OCR] Flushed ${flushed} codes to Neon during wait`);
+          }
+        }
+
+        try {
+          const result = await callGeminiPdf(chunks[i].toString("base64"));
+          if (result.codes.length > 0) {
+            log.success(
+              `  [PDF-OCR] Chunk ${i + 1}: ${result.codes.length} codes found`
+            );
+            allCodes.push(...result.codes);
+          } else {
+            log.detail(`  [PDF-OCR] Chunk ${i + 1}: no codes found`);
+          }
+        } catch (err) {
+          log.warn(
+            `  [PDF-OCR] Chunk ${i + 1} failed: ${err instanceof Error ? err.message.substring(0, 150) : err}`
+          );
+        }
+      }
+    }
+
+    if (allCodes.length === 0) {
       log.detail(`[PDF-OCR] No fault codes found in ${filename}`);
       return 0;
     }
 
-    log.success(`[PDF-OCR] Gemini found ${result.codes.length} codes in ${filename}`);
+    log.success(
+      `[PDF-OCR] Gemini found ${allCodes.length} codes in ${filename}`
+    );
 
-    const capped = filterAndCap(result.codes, MAX_CODES_PER_MANUAL);
+    const capped = filterAndCap(allCodes, MAX_CODES_PER_MANUAL);
     for (const fc of capped) {
       enqueueFaultCode({
         manualId,
@@ -277,14 +342,18 @@ export async function extractWithOcr(
         sourceUrl,
         sourcePage: fc.sourcePage,
       });
-      log.detail(`    [PDF-OCR] ${fc.code} - ${fc.title}${fc.sourcePage ? ` (p.${fc.sourcePage})` : ""}`);
+      log.detail(
+        `    [PDF-OCR] ${fc.code} - ${fc.title}${fc.sourcePage ? ` (p.${fc.sourcePage})` : ""}`
+      );
     }
 
     const saved = await flushDbQueue();
     if (saved > 0) log.success(`  [PDF-OCR] Pushed ${saved} codes to Neon`);
     return saved;
   } catch (err) {
-    log.warn(`[PDF-OCR] Failed: ${err instanceof Error ? err.message.substring(0, 200) : err}`);
+    log.warn(
+      `[PDF-OCR] Failed: ${err instanceof Error ? err.message.substring(0, 200) : err}`
+    );
     return 0;
   }
 }
