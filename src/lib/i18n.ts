@@ -107,6 +107,18 @@ const dict = {
   sourceManual: { en: "Source:", no: "Kilde:", de: "Quelle:", es: "Fuente:" },
   viewOfficialPDF: { en: "View Official PDF", no: "Åpne offisiell PDF", de: "Offizielles PDF öffnen", es: "Ver PDF oficial" },
   sourceUnderMaintenance: { en: "Source link under maintenance", no: "Kildelenke under vedlikehold", de: "Quelllink wird gewartet", es: "Enlace de fuente en mantenimiento" },
+  browseAllCodes: {
+    en: "Browse all codes in this manual",
+    no: "Se alle koder i denne manualen",
+    de: "Alle Codes in diesem Handbuch durchsuchen",
+    es: "Ver todos los códigos en este manual",
+  },
+  searchMoreCodes: {
+    en: "Search more codes in this manual",
+    no: "Søk flere koder i denne manualen",
+    de: "Mehr Codes in diesem Handbuch suchen",
+    es: "Buscar más códigos en este manual",
+  },
   translating: { en: "Translating...", no: "Oversetter...", de: "Übersetzen...", es: "Traduciendo..." },
 
   // ─── Brand page ───

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useTranslation } from "./TranslatedContent";
 
 function boldTechnicalTerms(text: string): React.ReactNode[] {
@@ -37,22 +37,55 @@ export function TranslatedDescription() {
 
 export function TranslatedAllSteps() {
   const { content } = useTranslation();
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+
   if (content.fixSteps.length === 0) return null;
+
+  function toggle(idx: number) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }
+
   return (
     <ol className="space-y-3">
-      {content.fixSteps.map((step, i) => (
-        <li
-          key={i}
-          className="flex items-start gap-3 rounded-lg border border-technical-600 bg-technical-900/50 p-3"
-        >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-accent font-mono text-xs font-bold text-technical-900">
-            {i + 1}
-          </span>
-          <p className="pt-0.5 text-sm leading-relaxed text-technical-200">
-            {boldTechnicalTerms(step)}
-          </p>
-        </li>
-      ))}
+      {content.fixSteps.map((step, i) => {
+        const done = checked.has(i);
+        return (
+          <li
+            key={i}
+            role="button"
+            tabIndex={0}
+            onClick={() => toggle(i)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(i); } }}
+            className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors select-none ${
+              done
+                ? "border-success/40 bg-success/5"
+                : "border-technical-600 bg-technical-900/50"
+            }`}
+          >
+            <span
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded font-mono text-xs font-bold transition-colors ${
+                done
+                  ? "bg-success text-white"
+                  : "bg-accent text-technical-900"
+              }`}
+            >
+              {done ? "✓" : i + 1}
+            </span>
+            <p
+              className={`pt-0.5 text-sm leading-relaxed transition-colors ${
+                done ? "text-technical-400 line-through" : "text-technical-200"
+              }`}
+            >
+              {boldTechnicalTerms(step)}
+            </p>
+          </li>
+        );
+      })}
     </ol>
   );
 }

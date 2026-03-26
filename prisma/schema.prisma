@@ -38,9 +38,11 @@ model FaultCode {
   code         String
   slug         String   @unique
   title        String
-  description  String
-  fixSteps     String[]
-  sourceUrl    String?
+  description   String
+  causes        String[]
+  requiredTools String[]
+  fixSteps      String[]
+  sourceUrl     String?
   sourcePage   Int?
   translations Json     @default("{}")
   isIndexed    Boolean  @default(false)

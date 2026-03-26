@@ -63,7 +63,7 @@ export default async function FaultCodePage({ params }: Props) {
 
   const fault = await prisma.faultCode.findUnique({
     where: { slug: faultSlug },
-    include: { manual: { include: { brand: true } } },
+    include: { manual: { include: { brand: true, _count: { select: { faultCodes: true } } } } },
   });
 
   if (
@@ -74,6 +74,8 @@ export default async function FaultCodePage({ params }: Props) {
     notFound();
 
   const displayName = stripBrand(fault.manual.name, fault.manual.brand.name);
+  const manualCodesCount = fault.manual._count.faultCodes;
+  const manualCodesHref = `/${fault.manual.brand.slug}/${fault.manual.slug}`;
 
   const englishContent = {
     title: fault.title,
@@ -203,6 +205,18 @@ export default async function FaultCodePage({ params }: Props) {
               </h2>
             </div>
             <TranslatedAllSteps />
+
+            {manualCodesCount > 1 && (
+              <a
+                href={manualCodesHref}
+                className="mt-4 flex items-center gap-2 rounded-lg border border-technical-600 bg-technical-900/50 p-3 text-sm font-medium text-accent transition hover:border-accent/40 hover:bg-accent/5"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+                </svg>
+                {t("browseAllCodes", locale)} ({manualCodesCount})
+              </a>
+            )}
           </section>
 
           <AdSlot slot="content" />
@@ -214,35 +228,33 @@ export default async function FaultCodePage({ params }: Props) {
                 <span className="font-medium text-technical-200">{t("sourceManual", locale)}</span>
                 {" "}{fault.manual.name}
               </div>
-              {(fault.sourceUrl || fault.manual.pdfUrl) && !fault.manual.isBroken ? (
-                <a
-                  href={fault.sourceUrl || fault.manual.pdfUrl!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-md bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/25"
-                >
-                  <svg
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2}
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-                    />
-                  </svg>
-                  {fault.sourcePage
-                    ? `Open Manual (Page ${fault.sourcePage})`
-                    : t("viewOfficialPDF", locale)}
-                </a>
-              ) : fault.manual.isBroken ? (
-                <span className="text-[10px] text-technical-400">
-                  {t("sourceUnderMaintenance", locale)}
-                </span>
-              ) : null}
+              <div className="flex items-center gap-2">
+                {(fault.sourceUrl || fault.manual.pdfUrl) && !fault.manual.isBroken ? (
+                  <>
+                    <a
+                      href={`/manuals/${fault.manual.id}${fault.sourcePage ? `?page=${fault.sourcePage}` : ""}`}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/25"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                      </svg>
+                      {fault.sourcePage
+                        ? `Open Manual (Page ${fault.sourcePage})`
+                        : t("viewOfficialPDF", locale)}
+                    </a>
+                    <a
+                      href={manualCodesHref}
+                      className="inline-flex items-center gap-1 rounded-md border border-technical-600 px-2.5 py-1.5 text-[11px] text-technical-300 transition hover:border-technical-500 hover:text-white"
+                    >
+                      {t("searchMoreCodes", locale)}
+                    </a>
+                  </>
+                ) : fault.manual.isBroken ? (
+                  <span className="text-[10px] text-technical-400">
+                    {t("sourceUnderMaintenance", locale)}
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
         </TranslatedContent>
