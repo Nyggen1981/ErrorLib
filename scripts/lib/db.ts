@@ -67,6 +67,7 @@ export async function upsertFaultCode(
   title: string,
   description: string,
   fixSteps: string[],
+  precomputedSlug?: string,
   sourceUrl?: string,
   sourcePage?: number,
   causes?: string[]
@@ -91,7 +92,9 @@ export async function upsertFaultCode(
     });
   }
 
-  const baseSlug = slugify(`${code}-${title}`);
+  const baseSlug = precomputedSlug && precomputedSlug.trim().length > 0
+    ? precomputedSlug
+    : slugify(`${code}-${title}`);
   let slug = baseSlug;
   let attempt = 0;
 
@@ -182,6 +185,7 @@ type QueueItem = {
   title: string;
   description: string;
   fixSteps: string[];
+  slug?: string;
   sourceUrl?: string;
   sourcePage?: number;
   causes?: string[];
@@ -210,6 +214,7 @@ export async function flushDbQueue(): Promise<number> {
           item.title,
           item.description,
           item.fixSteps,
+          item.slug,
           item.sourceUrl,
           item.sourcePage,
           item.causes

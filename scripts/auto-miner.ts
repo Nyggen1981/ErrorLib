@@ -484,13 +484,19 @@ async function mine(
 
     const manualStart = Date.now();
     try {
-      let count = await extractAndSave(pdf.pages, manual.id, pdf.url);
+      let count = await extractAndSave(pdf.pages, manual.id, pdf.url, {
+        brandName: brand,
+        manualName,
+      });
 
       // OCR fallback: if text extraction found nothing, try vision
       if (count === 0) {
         log.info(`  [OCR FALLBACK] Text extraction returned 0 codes, trying Gemini Vision...`);
         try {
-          count = await extractWithOcr(pdf.pdfPath, manual.id, pdf.url);
+          count = await extractWithOcr(pdf.pdfPath, manual.id, pdf.url, {
+            brandName: brand,
+            manualName,
+          });
         } catch (ocrErr) {
           log.warn(`  [OCR FALLBACK] Failed: ${ocrErr instanceof Error ? ocrErr.message.substring(0, 150) : ocrErr}`);
         }
@@ -569,7 +575,10 @@ async function mine(
 
       const ocrStart = Date.now();
       try {
-        const count = await extractWithOcr(dl.pdfPath, manual.id, dl.url);
+        const count = await extractWithOcr(dl.pdfPath, manual.id, dl.url, {
+          brandName: brand,
+          manualName,
+        });
         grandTotal += count;
         const durMs = Date.now() - ocrStart;
 

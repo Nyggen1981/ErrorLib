@@ -3,7 +3,7 @@ import path from "path";
 import { PDFDocument } from "pdf-lib";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { log } from "./logger.js";
-import { enqueueFaultCode, flushDbQueue, queueSize } from "./db.js";
+import { enqueueFaultCode, flushDbQueue, queueSize, slugify } from "./db.js";
 
 export { washManualTitle } from "../../src/lib/manual-title-wash.js";
 
@@ -15,6 +15,32 @@ export type ExtractedCode = {
   fixSteps: string[];
   sourcePage?: number;
 };
+
+type ExtractionContext = {
+  brandName: string;
+  manualName: string;
+};
+
+type CategoryConfidence = "high" | "low";
+
+type CategorySlug =
+  | "electrical"
+  | "communication"
+  | "mechanical"
+  | "thermal"
+  | "configuration"
+  | "software"
+  | "safety";
+
+const CATEGORY_SLUGS: CategorySlug[] = [
+  "electrical",
+  "communication",
+  "mechanical",
+  "thermal",
+  "configuration",
+  "software",
+  "safety",
+];
 
 export type ExtractionResult = {
   codes: ExtractedCode[];
@@ -87,7 +113,19 @@ export async function preflight(): Promise<boolean> {
   }
 }
 
-const BATCH_PROMPT = `You are a senior industrial automation engineer extracting fault codes from equipment manual pages. Your audience is field technicians who need precise, actionable data — not generic advice.
+function buildBatchPrompt(context?: ExtractionContext): string {
+  const contextBlock = context
+    ? `TECHNICAL CONTEXT:
+- Brand: ${context.brandName}
+- Manual: ${context.manualName}
+
+You are a senior service engineer. If the source text lacks specific repair steps for ${context.brandName} [CODE], use your internal technical knowledge to generate 3-5 logical, professional troubleshooting steps based on the fault description.
+`
+    : "";
+
+  return `You are a senior industrial automation engineer extracting fault codes from equipment manual pages. Your audience is field technicians who need precise, actionable data — not generic advice.
+
+${contextBlock}
 
 Analyze ALL pages and extract EVERY unique fault code, error code, or alarm code.
 
@@ -127,6 +165,7 @@ Strict filtering:
 - Return ONLY valid JSON. No markdown fences, no commentary.
 
 Output: { "codes": [{ "code": "...", "title": "...", "description": "...", "causes": ["..."], "fixSteps": ["..."], "sourcePage": N }] }`;
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -140,13 +179,137 @@ function parseRetryDelay(errorMsg: string): number | null {
   return null;
 }
 
+function normalizeText(s: string | undefined): string {
+  return (s ?? "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeList(items: string[] | undefined): string[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((s) => normalizeText(s))
+    .filter(Boolean);
+}
+
+function categorizeDescription(description: string): {
+  slug: CategorySlug;
+  confidence: CategoryConfidence;
+} {
+  const d = description.toLowerCase();
+  if (/\b(voltage|current|power|phase|overvoltage|undervoltage|short|ground fault)\b/i.test(d)) {
+    return { slug: "electrical", confidence: "high" };
+  }
+  if (/\b(comm|communication|bus|link|network|fieldbus|ethernet|can|profibus|modbus)\b/i.test(d)) {
+    return { slug: "communication", confidence: "high" };
+  }
+  if (/\b(temp|thermal|overheat|heatsink|fan)\b/i.test(d)) {
+    return { slug: "thermal", confidence: "high" };
+  }
+  if (/\b(parameter|setting|configuration|calibration)\b/i.test(d)) {
+    return { slug: "configuration", confidence: "high" };
+  }
+  if (/\b(software|firmware|checksum|watchdog|program|memory)\b/i.test(d)) {
+    return { slug: "software", confidence: "high" };
+  }
+  if (/\b(safety|sto|guard|interlock|estop|emergency stop)\b/i.test(d)) {
+    return { slug: "safety", confidence: "high" };
+  }
+  if (/\b(mechanical|bearing|shaft|jam|stuck|vibration|brake)\b/i.test(d)) {
+    return { slug: "mechanical", confidence: "high" };
+  }
+  return { slug: "configuration", confidence: "low" };
+}
+
+function parseCategorySlug(raw: string): CategorySlug | null {
+  const val = raw.trim().toLowerCase();
+  return CATEGORY_SLUGS.includes(val as CategorySlug) ? (val as CategorySlug) : null;
+}
+
+async function resolveCategoryWithLlm(
+  description: string,
+  context?: ExtractionContext
+): Promise<CategorySlug> {
+  const model = getGemini().getGenerativeModel({ model: "gemini-2.5-flash" });
+  const result = await model.generateContent(
+    `Pick exactly one category slug for this industrial fault description.\nAllowed slugs: ${CATEGORY_SLUGS.join(", ")}.\nReturn ONLY the slug string, nothing else.\n\nBrand: ${context?.brandName ?? "unknown"}\nManual: ${context?.manualName ?? "unknown"}\nDescription: ${description}`
+  );
+  const raw = result.response.text();
+  const parsed = parseCategorySlug(raw);
+  return parsed ?? "configuration";
+}
+
+async function enhanceFixStepsIfNeeded(
+  fc: ExtractedCode,
+  context?: ExtractionContext
+): Promise<string[]> {
+  const cleaned = normalizeList(fc.fixSteps);
+  if (cleaned.length >= 2) return cleaned.slice(0, 6);
+  try {
+    const model = getGemini().getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `You are a senior service engineer.\nKontekst: Feilkode: ${fc.code}, Navn: ${fc.title}, Beskrivelse: ${fc.description}, Utstyr: ${context?.brandName ?? "unknown"} ${context?.manualName ?? "unknown"}.\nIf the source text lacks specific repair steps for ${context?.brandName ?? "the equipment"} ${fc.code}, use your internal technical knowledge to generate 3-5 logical, professional troubleshooting steps based on the fault description.\nSafety: prioritize non-destructive checks (verify wiring, measure voltage/current, check parameters, inspect mechanical blockage, insulation checks where relevant). Do not guess internal component repair.\nReturn ONLY valid JSON array of strings.`;
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim().replace(/^```json?\s*/i, "").replace(/```\s*$/i, "");
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      const arr = parsed
+        .filter((x) => typeof x === "string")
+        .map((s) => normalizeText(s))
+        .filter(Boolean);
+      if (arr.length >= 2) return arr.slice(0, 6);
+    }
+  } catch {
+    /* keep original if enhancement fails */
+  }
+  return cleaned.slice(0, 6);
+}
+
+async function validateExtractedCodes(
+  codes: ExtractedCode[],
+  manualId: string,
+  context?: ExtractionContext
+): Promise<ExtractedCode[]> {
+  const validated: ExtractedCode[] = [];
+  for (const code of codes) {
+    const normalized: ExtractedCode = {
+      code: normalizeText(code.code),
+      title: normalizeText(code.title),
+      description: normalizeText(code.description),
+      causes: normalizeList(code.causes),
+      fixSteps: normalizeList(code.fixSteps),
+      sourcePage: code.sourcePage,
+    };
+
+    if (!normalized.code || !normalized.title) continue;
+    normalized.fixSteps = await enhanceFixStepsIfNeeded(normalized, context);
+    if (normalized.fixSteps.length < 2) continue;
+
+    const baseCategory = categorizeDescription(normalized.description);
+    let categorySlug = baseCategory.slug;
+    if (baseCategory.confidence === "low") {
+      try {
+        categorySlug = await resolveCategoryWithLlm(normalized.description, context);
+      } catch {
+        categorySlug = baseCategory.slug;
+      }
+    }
+    log.detail(
+      `    [CAT] ${normalized.code} -> ${categorySlug}${baseCategory.confidence === "low" ? " (llm)" : ""}`
+    );
+
+    // Final Prisma-aligned shape check (slug generated in DB layer from code+title+manual).
+    void manualId;
+    validated.push(normalized);
+  }
+  return validated;
+}
+
 async function callGeminiText(
   pagesText: string,
+  context?: ExtractionContext,
   maxRetries = 5
 ): Promise<ExtractionResult> {
   const model = getExtractionModel();
 
-  const prompt = `${BATCH_PROMPT}\n\n--- MANUAL TEXT START ---\n${pagesText}\n--- MANUAL TEXT END ---`;
+  const prompt = `${buildBatchPrompt(context)}\n\n--- MANUAL TEXT START ---\n${pagesText}\n--- MANUAL TEXT END ---`;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -244,13 +407,14 @@ function getOcrConsecutiveEmptyChunkLimit(): number {
 
 async function callGeminiPdf(
   pdfBase64: string,
+  context?: ExtractionContext,
   maxRetries = 3
 ): Promise<ExtractionResult> {
   const model = getExtractionModel();
 
   const parts = [
     {
-      text: `${BATCH_PROMPT}\n\nThe attached PDF is an industrial equipment manual. Analyze every page and extract ALL fault/error/alarm codes you can find, including from tables and images. For "sourcePage", use the actual PDF page number where each fault code appears.`,
+      text: `${buildBatchPrompt(context)}\n\nThe attached PDF is an industrial equipment manual. Analyze every page and extract ALL fault/error/alarm codes you can find, including from tables and images. For "sourcePage", use the actual PDF page number where each fault code appears.`,
     },
     {
       inlineData: {
@@ -310,7 +474,8 @@ async function splitPdf(
 export async function extractWithOcr(
   pdfPath: string,
   manualId: string,
-  sourceUrl?: string
+  sourceUrl?: string,
+  context?: ExtractionContext
 ): Promise<number> {
   const filename = path.basename(pdfPath);
   log.info(`[PDF-OCR] Sending raw PDF to Gemini: ${filename}`);
@@ -323,7 +488,7 @@ export async function extractWithOcr(
 
   try {
     if (pdfBuffer.length <= MAX_PDF_BYTES_PER_CHUNK) {
-      const result = await callGeminiPdf(pdfBuffer.toString("base64"));
+      const result = await callGeminiPdf(pdfBuffer.toString("base64"), context);
       allCodes = result.codes;
     } else {
       const chunks = await splitPdf(pdfBuffer, PAGES_PER_SPLIT);
@@ -354,7 +519,7 @@ export async function extractWithOcr(
         }
 
         try {
-          const result = await callGeminiPdf(chunks[i].toString("base64"));
+          const result = await callGeminiPdf(chunks[i].toString("base64"), context);
           if (result.codes.length > 0) {
             consecutiveEmptyChunks = 0;
             log.success(
@@ -393,10 +558,12 @@ export async function extractWithOcr(
     );
 
     const capped = filterAndCap(allCodes, MAX_CODES_PER_MANUAL);
-    for (const fc of capped) {
+    const validated = await validateExtractedCodes(capped, manualId, context);
+    for (const fc of validated) {
       enqueueFaultCode({
         manualId,
         code: fc.code,
+        slug: slugify(`${fc.code}-${fc.title}`),
         title: fc.title,
         description: fc.description || `Fault ${fc.code}`,
         fixSteps: (fc.fixSteps || []).slice(0, 6),
@@ -423,7 +590,8 @@ export async function extractWithOcr(
 export async function extractAndSave(
   pages: { pageNumber: number; text: string }[],
   manualId: string,
-  sourceUrl?: string
+  sourceUrl?: string,
+  context?: ExtractionContext
 ): Promise<number> {
   const chunks: { pageNumber: number; text: string }[][] = [];
   let currentChunk: { pageNumber: number; text: string }[] = [];
@@ -477,7 +645,7 @@ export async function extractAndSave(
     }
 
     try {
-      const result = await callGeminiText(chunkText);
+      const result = await callGeminiText(chunkText, context);
 
       if (result.codes.length === 0) {
         log.detail("  No fault codes found in this batch");
@@ -493,17 +661,19 @@ export async function extractAndSave(
   }
 
   const capped = filterAndCap(allCodes, MAX_CODES_PER_MANUAL);
+  const validated = await validateExtractedCodes(capped, manualId, context);
 
-  if (capped.length > 0) {
+  if (validated.length > 0) {
     console.log(
-      `[LIVE UPDATE] Queuing ${capped.length} codes for Neon push...`
+      `[LIVE UPDATE] Queuing ${validated.length} codes for Neon push...`
     );
   }
 
-  for (const fc of capped) {
+  for (const fc of validated) {
     enqueueFaultCode({
       manualId,
       code: fc.code,
+      slug: slugify(`${fc.code}-${fc.title}`),
       title: fc.title,
       description: fc.description || `Fault ${fc.code}`,
       fixSteps: (fc.fixSteps || []).slice(0, 6),
