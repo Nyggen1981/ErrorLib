@@ -16,6 +16,7 @@ import {
   disconnect,
   getPrisma,
   createMiningLog,
+  touchManualUpdated,
 } from "./lib/db.js";
 import {
   isAlreadyMined,
@@ -335,6 +336,10 @@ async function mineSpecificManual(
       brandName: effectiveBrand,
       manualName: manual.name,
     });
+  }
+
+  if (count > 0) {
+    await touchManualUpdated(manual.id);
   }
 
   markCompleted(filename, manual.pdfUrl, effectiveBrand, count);
@@ -660,6 +665,10 @@ async function mine(
         }
       }
 
+      if (count > 0) {
+        await touchManualUpdated(manual.id);
+      }
+
       grandTotal += count;
       const durMs = Date.now() - manualStart;
 
@@ -739,6 +748,9 @@ async function mine(
           brandName: brand,
           manualName,
         });
+        if (count > 0) {
+          await touchManualUpdated(manual.id);
+        }
         grandTotal += count;
         const durMs = Date.now() - ocrStart;
 

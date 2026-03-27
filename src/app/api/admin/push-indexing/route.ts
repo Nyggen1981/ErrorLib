@@ -3,9 +3,11 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { google } from "googleapis";
 import crypto from "crypto";
+import { indexingBrandPriorityScore } from "@/lib/indexing-priority";
 
 const BASE_URL = process.env.SITE_URL || "https://errorlib.net";
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 200;
+const FETCH_POOL = Math.max(BATCH_SIZE * 4, 800);
 
 function isAdmin(token: string | undefined): boolean {
   const pw = process.env.ADMIN_PASSWORD;
@@ -51,13 +53,13 @@ export async function POST() {
     );
   }
 
-  const codes = await prisma.faultCode.findMany({
+  const pool = await prisma.faultCode.findMany({
     where: { isIndexed: false },
-    orderBy: { createdAt: "desc" },
-    take: BATCH_SIZE,
+    take: FETCH_POOL,
     select: {
       id: true,
       slug: true,
+      updatedAt: true,
       manual: {
         select: {
           slug: true,
@@ -66,6 +68,15 @@ export async function POST() {
       },
     },
   });
+
+  pool.sort((a, b) => {
+    const pa = indexingBrandPriorityScore(a.manual.brand.slug);
+    const pb = indexingBrandPriorityScore(b.manual.brand.slug);
+    if (pa !== pb) return pa - pb;
+    return b.updatedAt.getTime() - a.updatedAt.getTime();
+  });
+
+  const codes = pool.slice(0, BATCH_SIZE);
 
   if (codes.length === 0) {
     return NextResponse.json({ pushed: 0, failed: 0, remaining: 0, done: true });
@@ -86,6 +97,7 @@ export async function POST() {
       pushed++;
     } catch {
       failed++;
+      /* Ikke marker isIndexed — URL prøves ved neste kjøring */
     }
     await new Promise((r) => setTimeout(r, 150));
   }

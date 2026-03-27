@@ -14,6 +14,13 @@ import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
 import type { Metadata } from "next";
 
+/**
+ * Hint til CDN / Full Route Cache der det er mulig.
+ * Merk: getLocale() bruker cookies(), så siden kan fortsatt være dynamisk per bruker;
+ * Googlebot uten lang-cookie får likevel statisk HTML når plattformen tillater det.
+ */
+export const revalidate = 3600;
+
 type Props = {
   params: Promise<{
     brandSlug: string;
@@ -74,17 +81,17 @@ export default async function FaultCodePage({ params }: Props) {
   )
     notFound();
 
+  const relatedRows = await prisma.faultCode.findMany({
+    where: { manualId: fault.manualId, id: { not: fault.id } },
+    select: { code: true, title: true, slug: true },
+    take: 40,
+    orderBy: { code: "asc" },
+  });
+  const relatedPick = relatedRows.slice(0, 3);
+
   const displayName = stripBrand(fault.manual.name, fault.manual.brand.name);
   const manualCodesCount = fault.manual._count.faultCodes;
   const manualCodesHref = `/${fault.manual.brand.slug}/${fault.manual.slug}`;
-
-  const relatedCodes = await prisma.faultCode.findMany({
-    where: { manualId: fault.manualId, id: { not: fault.id } },
-    select: { code: true, title: true, slug: true },
-    take: 20,
-  });
-  // Shuffle and pick 3 for variety on each page load
-  const shuffled = relatedCodes.sort(() => Math.random() - 0.5).slice(0, 3);
 
   const englishContent = {
     title: fault.title,
@@ -229,7 +236,7 @@ export default async function FaultCodePage({ params }: Props) {
 
           {/* Description */}
           <section className="mb-5 rounded-lg border border-technical-700 bg-technical-800 p-5 sm:p-6">
-            <h2 className="mb-3 text-lg font-bold text-technical-50">
+            <h2 className="mb-3 text-lg font-bold tracking-tight text-technical-50">
               {t("whatDoesMean", locale)} {fault.code} {t("mean", locale)}
             </h2>
             <TranslatedDescription />
@@ -255,7 +262,7 @@ export default async function FaultCodePage({ params }: Props) {
                 />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 22v-6" />
               </svg>
-              <h2 className="text-lg font-bold text-technical-50">
+              <h2 className="text-lg font-bold tracking-tight text-technical-50">
                 {t("repairSteps", locale)}
               </h2>
             </div>
@@ -288,13 +295,13 @@ export default async function FaultCodePage({ params }: Props) {
           <AdSlot slot="content" />
 
           {/* Related Faults */}
-          {shuffled.length > 0 && (
+          {relatedPick.length > 0 && (
             <section className="mb-5">
               <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-technical-400">
                 {t("relatedFaults", locale)}
               </h2>
               <div className="grid gap-2 sm:grid-cols-3">
-                {shuffled.map((related) => (
+                {relatedPick.map((related) => (
                   <a
                     key={related.slug}
                     href={`/${brandSlug}/${manualSlug}/${related.slug}`}

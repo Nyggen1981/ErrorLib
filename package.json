@@ -15,6 +15,7 @@
     "db:seed": "npx tsx prisma/seed.ts",
     "list-modules": "npx tsx scripts/list-modules.ts",
     "list-modules:flat": "npx tsx scripts/list-modules.ts --flat",
+    "export-catalog": "npx tsx scripts/export-catalog.ts",
     "db:cleanup-orphan-codes": "npx tsx scripts/cleanup-orphan-fault-codes.ts",
     "db:cleanup-orphan-codes:execute": "npx tsx scripts/cleanup-orphan-fault-codes.ts --execute",
     "db:backfill-series-display": "npx tsx scripts/backfill-series-display.ts",

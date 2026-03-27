@@ -23,6 +23,15 @@ export async function disconnect() {
   }
 }
 
+/** Oppdaterer manual.updatedAt (sitemap / Google lastmod når innhold er re-minet). */
+export async function touchManualUpdated(manualId: string): Promise<void> {
+  const prisma = getPrisma();
+  await prisma.manual.update({
+    where: { id: manualId },
+    data: { updatedAt: new Date() },
+  });
+}
+
 export function slugify(text: string): string {
   return text
     .normalize("NFKD")

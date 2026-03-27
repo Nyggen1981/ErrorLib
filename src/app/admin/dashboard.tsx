@@ -1656,7 +1656,7 @@ function GoogleIndexingPanel() {
                 disabled={stats?.remaining === 0}
                 className="rounded-lg border border-technical-600 px-3 py-2 text-sm text-technical-300 transition hover:border-technical-500 hover:text-white disabled:opacity-50"
               >
-                Push 100
+                Push batch (200)
               </button>
               <button
                 onClick={() => handlePush(true)}
