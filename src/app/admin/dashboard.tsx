@@ -2069,7 +2069,7 @@ export function AdminDashboard({
       {/* Stats Cards */}
       <div className="mb-8 grid gap-4 sm:grid-cols-3">
         <StatCard
-          label="Total Fault Codes"
+          label="Fault codes (active manuals)"
           value={stats.faultCount}
           accent="text-accent"
         />

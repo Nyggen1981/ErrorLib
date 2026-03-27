@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
+import { countListedFaultCodes } from "@/lib/fault-code-stats";
 import { prisma } from "@/lib/prisma";
 import { AdminDashboard } from "./dashboard";
 
@@ -35,7 +36,7 @@ export default async function AdminPage() {
   ] = await Promise.all([
     prisma.brand.count(),
     prisma.manual.count(),
-    prisma.faultCode.count(),
+    countListedFaultCodes(prisma),
     prisma.brand.findMany({
       include: {
         _count: { select: { manuals: true } },
@@ -88,7 +89,9 @@ export default async function AdminPage() {
     name: b.name,
     slug: b.slug,
     manuals: b._count.manuals,
-    faultCodes: b.manuals.reduce((sum, m) => sum + m._count.faultCodes, 0),
+    faultCodes: b.manuals
+      .filter((m) => !m.isBroken)
+      .reduce((sum, m) => sum + m._count.faultCodes, 0),
   }));
 
   const recentActivity = recentFaults.map((f) => ({

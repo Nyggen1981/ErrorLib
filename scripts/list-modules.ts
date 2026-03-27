@@ -22,7 +22,9 @@ function printFlatTree(brands: Awaited<ReturnType<typeof prisma.brand.findMany>>
   let grandCodes = 0;
 
   for (const b of brands) {
-    const manualsWithCodes = b.manuals.filter((m) => m._count.faultCodes > 0);
+    const manualsWithCodes = b.manuals.filter(
+      (m) => !m.isBroken && m._count.faultCodes > 0
+    );
     const total = manualsWithCodes.reduce((s, m) => s + m._count.faultCodes, 0);
     if (total === 0) continue;
 
@@ -36,7 +38,7 @@ function printFlatTree(brands: Awaited<ReturnType<typeof prisma.brand.findMany>>
   }
 
   const withContent = brands.filter((b) =>
-    b.manuals.some((m) => m._count.faultCodes > 0)
+    b.manuals.some((m) => !m.isBroken && m._count.faultCodes > 0)
   ).length;
   console.log(
     `\n---\nTotalt: ${withContent} merker med innhold, ${grandManuals} manualer, ${grandCodes} feilkoder`
@@ -45,7 +47,7 @@ function printFlatTree(brands: Awaited<ReturnType<typeof prisma.brand.findMany>>
 
 function printSeriesTree(brands: Awaited<ReturnType<typeof prisma.brand.findMany>>) {
   console.log(
-    "=== Merker og underkategorier (som på /[brandSlug]: groupManuals + 80 % serie-merge) ===\n"
+    "=== Merker og underkategorier (kun aktive manualer, isBroken=false; groupManuals + 80 % serie-merge) ===\n"
   );
 
   let grandGroups = 0;
@@ -54,7 +56,9 @@ function printSeriesTree(brands: Awaited<ReturnType<typeof prisma.brand.findMany
   let brandsWithContent = 0;
 
   for (const b of brands) {
-    const manualsWithCodes = b.manuals.filter((m) => m._count.faultCodes > 0);
+    const manualsWithCodes = b.manuals.filter(
+      (m) => !m.isBroken && m._count.faultCodes > 0
+    );
     if (manualsWithCodes.length === 0) continue;
 
     brandsWithContent++;

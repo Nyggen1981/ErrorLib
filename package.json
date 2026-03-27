@@ -15,6 +15,8 @@
     "db:seed": "npx tsx prisma/seed.ts",
     "list-modules": "npx tsx scripts/list-modules.ts",
     "list-modules:flat": "npx tsx scripts/list-modules.ts --flat",
+    "db:cleanup-orphan-codes": "npx tsx scripts/cleanup-orphan-fault-codes.ts",
+    "db:cleanup-orphan-codes:execute": "npx tsx scripts/cleanup-orphan-fault-codes.ts --execute",
     "db:cleanup-brands": "npx tsx scripts/cleanup-brands-migration.ts",
     "db:cleanup-brands:execute": "npx tsx scripts/cleanup-brands-migration.ts --execute",
     "db:cleanup-db": "npx tsx scripts/cleanup-db.ts",
