@@ -1,58 +1,116 @@
 import type { Metadata } from "next";
+import Script from "next/script";
+import { t } from "@/lib/i18n";
+import { getLocale, getActiveLanguages } from "@/lib/locale";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { SearchBar } from "@/components/SearchBar";
+import { HreflangTags } from "@/components/HreflangTags";
+import { Footer } from "@/components/Footer";
 import "./globals.css";
 
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+
 export const metadata: Metadata = {
+  metadataBase: new URL("https://errorlib.net"),
   title: {
-    default: "ErrorLib - Industrial Fault Code Library",
+    default: "ErrorLib — Industrial Fault Code Library | Troubleshooting Guides",
     template: "%s | ErrorLib",
   },
   description:
-    "Comprehensive fault code database for industrial equipment. Quick troubleshooting guides for ABB, Siemens, Danfoss drives and more.",
+    "Comprehensive fault code database for industrial equipment. Step-by-step troubleshooting guides for ABB, Siemens, Danfoss, Yaskawa drives, PLCs, and controllers.",
   openGraph: {
     type: "website",
     locale: "en_US",
     siteName: "ErrorLib",
   },
+  alternates: {
+    canonical: "/",
+  },
+  other: {
+    "google-site-verification": "",
+  },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
+  const activeLanguages = await getActiveLanguages();
+
   return (
-    <html lang="en">
-      <body className="bg-technical-50 text-technical-900 antialiased">
-        <header className="border-b border-technical-200 bg-white">
-          <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-            <a href="/" className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-technical-900">
-                <span className="font-mono text-sm font-bold text-white">
+    <html lang={locale}>
+      <head>
+        <HreflangTags activeLanguages={activeLanguages} />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="bg-technical-900 text-technical-100 antialiased">
+        {GA_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="gtag-init" strategy="afterInteractive">
+              {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');`}
+            </Script>
+          </>
+        )}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "ErrorLib",
+              url: "https://errorlib.net",
+              description: "Industrial Fault Code Library with troubleshooting guides for ABB, Siemens, Danfoss, Yaskawa and more.",
+              publisher: {
+                "@type": "Organization",
+                name: "ErrorLib",
+                url: "https://errorlib.net",
+              },
+            }),
+          }}
+        />
+        <header className="border-b border-technical-700 bg-technical-800">
+          <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+            <a href="/" className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent">
+                <span className="font-mono text-sm font-bold text-technical-900">
                   EL
                 </span>
               </div>
-              <span className="text-lg font-semibold tracking-tight">
+              <span className="text-lg font-semibold tracking-tight text-white">
                 ErrorLib
               </span>
             </a>
-            <div className="flex items-center gap-6 text-sm text-technical-500">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="hidden w-56 sm:block lg:w-72">
+                <SearchBar variant="header" locale={locale} />
+              </div>
               <a
                 href="/"
-                className="transition-colors hover:text-technical-900"
+                className="hidden text-sm text-technical-300 transition-colors hover:text-white sm:block"
               >
-                Brands
+                {t("brands", locale)}
               </a>
+              <LanguageSwitcher current={locale} activeLanguages={activeLanguages} />
             </div>
           </nav>
         </header>
-        <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-          {children}
-        </main>
-        <footer className="border-t border-technical-200 bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-6 text-center text-sm text-technical-400 sm:px-6">
-            ErrorLib &mdash; Industrial Fault Code Reference
-          </div>
-        </footer>
+        <main className="overflow-x-hidden">{children}</main>
+        <Footer locale={locale} />
       </body>
     </html>
   );

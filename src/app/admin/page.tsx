@@ -1,0 +1,176 @@
+import { redirect } from "next/navigation";
+import { isAdminAuthenticated } from "@/lib/admin-auth";
+import { countListedFaultCodes } from "@/lib/fault-code-stats";
+import { prisma } from "@/lib/prisma";
+import { AdminDashboard } from "./dashboard";
+
+export const dynamic = "force-dynamic";
+
+export const metadata = {
+  title: "Admin Dashboard",
+  robots: { index: false, follow: false },
+};
+
+export default async function AdminPage() {
+  const authed = await isAdminAuthenticated();
+  if (!authed) redirect("/admin/login");
+
+  // Mark stale "started" mining logs as aborted (from interrupted runs)
+  const fiveMinAgo = new Date(Date.now() - 5 * 60_000);
+  await prisma.miningLog.updateMany({
+    where: { status: "started", createdAt: { lt: fiveMinAgo } },
+    data: { status: "aborted", message: "Miner was interrupted" },
+  });
+
+  const [
+    brandCount,
+    manualCount,
+    faultCount,
+    brands,
+    recentFaults,
+    miningLogs,
+    allMiningLogs,
+    queueItems,
+    userRequests,
+    manuals,
+  ] = await Promise.all([
+    prisma.brand.count(),
+    prisma.manual.count(),
+    countListedFaultCodes(prisma),
+    prisma.brand.findMany({
+      include: {
+        _count: { select: { manuals: true } },
+        manuals: {
+          include: { _count: { select: { faultCodes: true } } },
+        },
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.faultCode.findMany({
+      take: 10,
+      orderBy: { createdAt: "desc" },
+      include: {
+        manual: {
+          include: { brand: true },
+        },
+      },
+    }),
+    prisma.miningLog.findMany({
+      take: 20,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.miningLog.findMany({
+      take: 5000,
+      orderBy: { createdAt: "desc" },
+      select: {
+        brand: true,
+        manual: true,
+        status: true,
+        createdAt: true,
+      },
+    }),
+    prisma.miningQueue.findMany({
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.userRequest.findMany({
+      orderBy: [{ voteCount: "desc" }, { createdAt: "desc" }],
+      take: 50,
+    }),
+    prisma.manual.findMany({
+      include: {
+        brand: true,
+        _count: { select: { faultCodes: true } },
+      },
+      orderBy: [{ brand: { name: "asc" } }, { name: "asc" }],
+    }),
+  ]);
+
+  const brandStats = brands.map((b) => ({
+    name: b.name,
+    slug: b.slug,
+    manuals: b._count.manuals,
+    faultCodes: b.manuals
+      .filter((m) => !m.isBroken)
+      .reduce((sum, m) => sum + m._count.faultCodes, 0),
+  }));
+
+  const recentActivity = recentFaults.map((f) => ({
+    id: f.id,
+    code: f.code,
+    title: f.title,
+    brandName: f.manual.brand.name,
+    manualName: f.manual.name,
+    createdAt: f.createdAt.toISOString(),
+  }));
+
+  const miningLogData = miningLogs.map((l) => ({
+    id: l.id,
+    brand: l.brand,
+    manual: l.manual,
+    codesFound: l.codesFound,
+    pagesUsed: l.pagesUsed,
+    durationMs: l.durationMs,
+    status: l.status,
+    message: l.message,
+    createdAt: l.createdAt.toISOString(),
+  }));
+
+  const queueData = queueItems.map((q) => ({
+    id: q.id,
+    brandName: q.brandName,
+    status: q.status,
+    createdAt: q.createdAt.toISOString(),
+  }));
+
+  const userRequestData = userRequests.map((r) => ({
+    id: r.id,
+    brand: r.brand,
+    model: r.model,
+    status: r.status,
+    voteCount: r.voteCount,
+    createdAt: r.createdAt.toISOString(),
+  }));
+
+  const latestByBrandManual = new Map<string, { status: string; createdAt: Date }>();
+  for (const l of allMiningLogs) {
+    const key = `${l.brand.toLowerCase()}::${l.manual.toLowerCase()}`;
+    if (!latestByBrandManual.has(key)) {
+      latestByBrandManual.set(key, { status: l.status, createdAt: l.createdAt });
+    }
+  }
+
+  const manualControlData = manuals.map((m) => {
+    const key = `${m.brand.name.toLowerCase()}::${m.name.toLowerCase()}`;
+    const latest = latestByBrandManual.get(key);
+    const mappedStatus =
+      latest?.status === "success"
+        ? "success"
+        : latest?.status === "empty"
+          ? "empty"
+          : latest && ["failed", "aborted"].includes(latest.status)
+            ? "error"
+            : "never";
+    return {
+      id: m.id,
+      brandName: m.brand.name,
+      brandSlug: m.brand.slug,
+      manualName: m.name,
+      manualSlug: m.slug,
+      faultCodes: m._count.faultCodes,
+      status: mappedStatus as "success" | "empty" | "error" | "never",
+      lastMined: latest?.createdAt.toISOString() ?? null,
+    };
+  });
+
+  return (
+    <AdminDashboard
+      stats={{ brandCount, manualCount, faultCount }}
+      brandStats={brandStats}
+      recentActivity={recentActivity}
+      miningLogs={miningLogData}
+      queue={queueData}
+      userRequests={userRequestData}
+      manuals={manualControlData}
+    />
+  );
+}
