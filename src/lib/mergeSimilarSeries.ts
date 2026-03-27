@@ -3,6 +3,8 @@
  * (e.g. "SYSMAC CJ2 CPU" vs "CJ-series CJ2 CPU").
  */
 
+import { cleanSeriesTitle } from "@/lib/manual-title-wash";
+
 export type SeriesGroupMergeable = {
   series: string;
   manuals: unknown[];
@@ -75,6 +77,33 @@ export function seriesNameSimilarity(a: string, b: string): number {
   return Math.max(l1, l2);
 }
 
+function bothStartWithIndraDrive(a: string, b: string): boolean {
+  return /^\s*indra\s*drive\b/i.test(a) && /^\s*indra\s*drive\b/i.test(b);
+}
+
+/** Both strings carry a 3–6 digit model number and the largest differs by ≥5× from the smallest (≥100). */
+function radicallyDifferentIndraDriveModels(a: string, b: string): boolean {
+  const nums = (s: string) =>
+    (s.match(/\b\d{3,6}\b/g) ?? []).map((x) => parseInt(x, 10));
+  const all = [...nums(a), ...nums(b)];
+  if (all.length === 0) return false;
+  const lo = Math.min(...all);
+  const hi = Math.max(...all);
+  if (lo < 100) return false;
+  return hi / lo >= 5;
+}
+
+function shouldMergeSeriesNames(a: string, b: string, threshold: number): boolean {
+  if (seriesNameSimilarity(a, b) >= threshold) return true;
+  if (
+    bothStartWithIndraDrive(a, b) &&
+    !radicallyDifferentIndraDriveModels(a, b)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /** Prefer shortest display name; tie-break: fewer words, then locale sort */
 export function pickCanonicalSeriesName(names: string[]): string {
   const unique = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
@@ -113,7 +142,9 @@ export function mergeSimilarSeriesGroups<T extends SeriesGroupMergeable>(
 
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
-      if (seriesNameSimilarity(groups[i].series, groups[j].series) >= threshold) {
+      if (
+        shouldMergeSeriesNames(groups[i].series, groups[j].series, threshold)
+      ) {
         union(i, j);
       }
     }
@@ -129,7 +160,9 @@ export function mergeSimilarSeriesGroups<T extends SeriesGroupMergeable>(
   const merged: T[] = [];
   for (const indices of clusters.values()) {
     const parts = indices.map((idx) => groups[idx]);
-    const series = pickCanonicalSeriesName(parts.map((p) => p.series));
+    const series = cleanSeriesTitle(
+      pickCanonicalSeriesName(parts.map((p) => p.series))
+    );
     const manuals = parts.flatMap((p) => p.manuals) as T["manuals"];
     const totalCodes = parts.reduce((s, p) => s + p.totalCodes, 0);
     merged.push({ ...parts[0], series, manuals, totalCodes });

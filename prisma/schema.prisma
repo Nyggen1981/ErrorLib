@@ -8,12 +8,27 @@ datasource db {
 }
 
 model Brand {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  manuals   Manual[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String        @id @default(cuid())
+  name         String
+  slug         String        @unique
+  manuals      Manual[]
+  seriesGroups SeriesGroup[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+/** Optional display title for a computed series box on the brand page (seriesKey = internal key). */
+model SeriesGroup {
+  id          String   @id @default(cuid())
+  brandId     String
+  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  seriesKey   String
+  displayName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([brandId, seriesKey])
+  @@index([brandId])
 }
 
 model Manual {

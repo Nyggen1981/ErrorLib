@@ -1749,6 +1749,211 @@ type Suggestion = {
   reason: string;
 };
 
+type AdminSeriesRow = {
+  seriesKey: string;
+  displayName: string | null;
+  manualCount: number;
+  totalCodes: number;
+};
+
+function SeriesTitlesPanel({
+  brandStats,
+}: {
+  brandStats: { name: string; slug: string; manuals: number; faultCodes: number }[];
+}) {
+  const [slug, setSlug] = useState("");
+  const [rows, setRows] = useState<AdminSeriesRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editKey, setEditKey] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!slug) {
+      setRows([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/admin/series-groups?slug=${encodeURIComponent(slug)}`
+        );
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok) {
+          setError(data.error || "Load failed");
+          setRows([]);
+        } else {
+          setRows(data.series ?? []);
+        }
+      } catch {
+        if (!cancelled) {
+          setError("Network error");
+          setRows([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  async function saveRow(seriesKey: string, displayName: string) {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/series-groups", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brandSlug: slug,
+          seriesKey,
+          displayName: displayName.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Save failed");
+        return;
+      }
+      setEditKey(null);
+      setRows((prev) =>
+        prev.map((r) =>
+          r.seriesKey === seriesKey
+            ? {
+                ...r,
+                displayName: displayName.trim() ? displayName.trim() : null,
+              }
+            : r
+        )
+      );
+    } catch {
+      setError("Network error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
+      <h2 className="mb-1 text-lg font-semibold text-white">
+        Brand management — series titles
+      </h2>
+      <p className="mb-4 text-sm text-technical-400">
+        Override labels on the public brand grid. The{" "}
+        <code className="rounded bg-technical-900 px-1">?series=</code> URL key
+        stays the internal series key.
+      </p>
+      <select
+        value={slug}
+        onChange={(e) => {
+          setSlug(e.target.value);
+          setEditKey(null);
+        }}
+        className="mb-4 w-full max-w-md rounded-lg border border-technical-600 bg-technical-900 px-3 py-2 text-sm text-white outline-none focus:border-accent"
+      >
+        <option value="">Select brand…</option>
+        {brandStats.map((b) => (
+          <option key={b.slug} value={b.slug}>
+            {b.name}
+          </option>
+        ))}
+      </select>
+      {error && <p className="mb-2 text-sm text-danger">{error}</p>}
+      {slug && loading && (
+        <p className="text-sm text-technical-500">Loading series…</p>
+      )}
+      {slug && !loading && rows.length === 0 && (
+        <p className="text-sm text-technical-500">No series with fault codes.</p>
+      )}
+      {slug && !loading && rows.length > 0 && (
+        <div className="max-h-96 overflow-auto rounded-lg border border-technical-700">
+          <table className="w-full text-left text-sm">
+            <thead className="sticky top-0 z-10 bg-technical-900 text-xs text-technical-400">
+              <tr>
+                <th className="p-2 pr-3">Series key (URL)</th>
+                <th className="p-2">Display title</th>
+                <th className="p-2 text-right">Manuals</th>
+                <th className="p-2 text-right">Codes</th>
+                <th className="w-28 p-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.seriesKey} className="border-t border-technical-700">
+                  <td className="max-w-[200px] truncate p-2 pr-3 font-mono text-xs text-technical-300">
+                    {r.seriesKey}
+                  </td>
+                  <td className="p-2">
+                    {editKey === r.seriesKey ? (
+                      <input
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="w-full min-w-[12rem] rounded border border-technical-600 bg-technical-900 px-2 py-1 text-sm text-white"
+                        placeholder="Empty = clear override"
+                      />
+                    ) : (
+                      <span className="text-technical-100">
+                        {r.displayName ?? (
+                          <span className="text-technical-500">(auto)</span>
+                        )}
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-2 text-right tabular-nums text-technical-400">
+                    {r.manualCount}
+                  </td>
+                  <td className="p-2 text-right tabular-nums text-technical-400">
+                    {r.totalCodes}
+                  </td>
+                  <td className="p-2">
+                    {editKey === r.seriesKey ? (
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-center">
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => saveRow(r.seriesKey, editValue)}
+                          className="text-xs font-medium text-accent hover:underline disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditKey(null)}
+                          className="text-xs text-technical-500 hover:text-technical-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditKey(r.seriesKey);
+                          setEditValue(r.displayName ?? "");
+                        }}
+                        className="text-xs font-medium text-accent hover:underline"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ExpandBrandPanel({
   brandStats,
 }: {
@@ -2123,8 +2328,9 @@ export function AdminDashboard({
         <GoogleIndexingPanel />
       </div>
 
-      {/* Expand Brand */}
-      <div className="mb-8">
+      {/* Brand management */}
+      <div className="mb-8 space-y-8">
+        <SeriesTitlesPanel brandStats={brandStats} />
         <ExpandBrandPanel brandStats={brandStats} />
       </div>
 

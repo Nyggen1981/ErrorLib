@@ -11,6 +11,7 @@ import "dotenv/config";
 import { PrismaClient } from "../generated/prisma/client.js";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { groupManualsAsOnSite } from "../src/lib/brand-series-grouping.ts";
+import { displayTitleForSeries } from "../src/lib/series-display.ts";
 
 const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
@@ -45,9 +46,12 @@ function printFlatTree(brands: Awaited<ReturnType<typeof prisma.brand.findMany>>
   );
 }
 
-function printSeriesTree(brands: Awaited<ReturnType<typeof prisma.brand.findMany>>) {
+function printSeriesTree(
+  brands: Awaited<ReturnType<typeof prisma.brand.findMany>>,
+  overrideByBrandId: Map<string, Map<string, string>>
+) {
   console.log(
-    "=== Merker og underkategorier (kun aktive manualer, isBroken=false; groupManuals + 80 % serie-merge) ===\n"
+    "=== Merker og underkategorier (kun aktive manualer; serie-merge + DB displayName) ===\n"
   );
 
   let grandGroups = 0;
@@ -70,9 +74,11 @@ function printSeriesTree(brands: Awaited<ReturnType<typeof prisma.brand.findMany
     console.log(`\n## ${b.name}`);
     console.log(`   slug: ${b.slug}  |  ${manualsWithCodes.length} manual(er) → ${groups.length} serie-rute(r) på forsiden av merket`);
 
+    const ov = overrideByBrandId.get(b.id) ?? new Map<string, string>();
     for (const g of groups) {
+      const shown = displayTitleForSeries(g.series, ov);
       console.log(
-        `\n   [${g.series}]  —  ${g.manuals.length} manual(er), ${g.totalCodes} feilkoder`
+        `\n   [${shown}]  —  ${g.manuals.length} manual(er), ${g.totalCodes} feilkoder`
       );
       for (const { manual, label } of g.manuals) {
         console.log(
@@ -104,10 +110,23 @@ async function main() {
     },
   });
 
+  const allOverrides = await prisma.seriesGroup.findMany({
+    select: { brandId: true, seriesKey: true, displayName: true },
+  });
+  const overrideByBrandId = new Map<string, Map<string, string>>();
+  for (const o of allOverrides) {
+    const d = o.displayName?.trim();
+    if (!d) continue;
+    if (!overrideByBrandId.has(o.brandId)) {
+      overrideByBrandId.set(o.brandId, new Map());
+    }
+    overrideByBrandId.get(o.brandId)!.set(o.seriesKey, d);
+  }
+
   if (flatOnly) {
     printFlatTree(brands);
   } else {
-    printSeriesTree(brands);
+    printSeriesTree(brands, overrideByBrandId);
   }
 }
 

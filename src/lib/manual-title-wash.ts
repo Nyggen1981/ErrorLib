@@ -52,6 +52,69 @@ function stripLeadingNoise(s: string): string {
   return t;
 }
 
+/** Collapse consecutive duplicate words (case-insensitive), e.g. "Drive Drive" → "Drive". */
+export function deduplicateAdjacentWords(title: string): string {
+  const parts = title.trim().split(/\s+/).filter(Boolean);
+  const out: string[] = [];
+  for (const w of parts) {
+    if (
+      out.length > 0 &&
+      out[out.length - 1]!.toLowerCase() === w.toLowerCase()
+    ) {
+      continue;
+    }
+    out.push(w);
+  }
+  return out.join(" ");
+}
+
+const INDUSTRY_TAIL = [
+  "drives",
+  "drive",
+  "controllers",
+  "controller",
+  "inverters",
+  "inverter",
+  "motors",
+  "motor",
+] as const;
+
+function stemContainsIndustryWord(stemLower: string, tailLower: string): boolean {
+  const base = tailLower.replace(/s$/, "");
+  if (base === "drive" && stemLower.includes("drive")) return true;
+  if (
+    (base === "controller" || base === "control") &&
+    (stemLower.includes("control") || stemLower.endsWith("controller"))
+  ) {
+    return true;
+  }
+  if (base === "inverter" && stemLower.includes("inverter")) return true;
+  if (base === "motor" && stemLower.includes("motor")) return true;
+  return false;
+}
+
+/**
+ * Drop a trailing industry word when the rest of the title already implies it
+ * (e.g. "IndraDrive Drive" → "IndraDrive").
+ */
+export function deduplicateTerms(title: string): string {
+  let words = deduplicateAdjacentWords(title).split(/\s+/).filter(Boolean);
+  while (words.length >= 2) {
+    const last = words[words.length - 1]!.toLowerCase();
+    const hit = INDUSTRY_TAIL.find((w) => last === w);
+    if (!hit) break;
+    const stem = words.slice(0, -1).join(" ").toLowerCase();
+    if (!stemContainsIndustryWord(stem, last)) break;
+    words = words.slice(0, -1);
+  }
+  return words.join(" ");
+}
+
+/** Title cleanup for series keys and miner output (adjacent dupes + redundant industry tails). */
+export function cleanSeriesTitle(title: string): string {
+  return deduplicateTerms(deduplicateAdjacentWords(title.trim()));
+}
+
 export function washManualTitle(raw: string): string {
   let s = stripLeadingNoise(raw.trim());
   // Common UTF-8 mojibake for Greek letters (e.g. Fanuc αi in PDFs)
@@ -71,5 +134,5 @@ export function washManualTitle(raw: string): string {
 
 /** Canonical title sanitizer used by miner + cleanup scripts */
 export function sanitizeTitle(raw: string): string {
-  return washManualTitle(raw);
+  return cleanSeriesTitle(washManualTitle(raw));
 }

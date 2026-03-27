@@ -3,7 +3,7 @@
  * fold generic buckets, then (in the app) mergeSimilarSeriesGroups is applied on top.
  */
 
-import { washManualTitle } from "@/lib/manual-title-wash";
+import { cleanSeriesTitle, washManualTitle } from "@/lib/manual-title-wash";
 import { mergeSimilarSeriesGroups } from "./mergeSimilarSeries";
 
 export type ManualWithCount = {
@@ -13,7 +13,7 @@ export type ManualWithCount = {
   _count: { faultCodes: number };
 };
 
-export type SeriesGroup = {
+export type SeriesGridGroup = {
   series: string;
   manuals: { manual: ManualWithCount; label: string }[];
   totalCodes: number;
@@ -29,6 +29,8 @@ const SERIES_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
   [/\b(SINAMICS)\s+(\w+)/i, (m) => `SINAMICS ${m[2]}`],
   [/\b(SINUMERIK)\s+(\w+)/i, (m) => `SINUMERIK ${m[2]}`],
   [/\b(MOVIDRIVE)\b/i, () => "MOVIDRIVE"],
+  [/\b(IndraDrive)\s+([A-Za-z0-9][\w.-]*)\b/i, (m) => `IndraDrive ${m[2]}`],
+  [/\b(IndraDrive)\b/i, () => "IndraDrive"],
   [/\b(MOVIFIT)\b/i, () => "MOVIFIT"],
   [/\b(MCBSM)\b/i, () => "MCBSM"],
   [/\b(Altivar|ALTIVAR|ATV)\s*(\d+)/i, (m) => `Altivar ${m[2]}`],
@@ -145,22 +147,24 @@ export function extractSeries(manualName: string, brandName: string): string {
 
   const brandNorm = brandName.trim();
   if (/^huawei$/i.test(brandNorm) && /\bSUN2000\b/i.test(stripped)) {
-    return "SUN2000 Series";
+    return cleanSeriesTitle("SUN2000 Series");
   }
   if (/^sma$/i.test(brandNorm) && /\bSunny\s+Boy\b/i.test(stripped)) {
-    return "Sunny Boy Series";
+    return cleanSeriesTitle("Sunny Boy Series");
   }
 
   for (const [pattern, extract] of SERIES_PATTERNS) {
     const match = stripped.match(pattern);
-    if (match) return extract(match);
+    if (match) return cleanSeriesTitle(extract(match));
   }
 
   const words = stripped.split(/\s+/);
   const lead = words
     .slice(0, 3)
     .filter((w) => /^[A-Z0-9]/.test(w) && w.length >= 2 && !PART_NUMBER_RE.test(w));
-  return lead.length > 0 ? lead.join(" ") : words.slice(0, 2).join(" ");
+  const raw =
+    lead.length > 0 ? lead.join(" ") : words.slice(0, 2).join(" ");
+  return cleanSeriesTitle(raw);
 }
 
 export function manualLabel(
@@ -203,8 +207,8 @@ export function manualLabel(
 export function groupManuals(
   manuals: ManualWithCount[],
   brandName: string
-): SeriesGroup[] {
-  const groups = new Map<string, SeriesGroup>();
+): SeriesGridGroup[] {
+  const groups = new Map<string, SeriesGridGroup>();
 
   for (const manual of manuals) {
     if (manual._count.faultCodes === 0) continue;
@@ -225,8 +229,8 @@ export function groupManuals(
     }
   }
 
-  const generics: SeriesGroup[] = [];
-  const real: SeriesGroup[] = [];
+  const generics: SeriesGridGroup[] = [];
+  const real: SeriesGridGroup[] = [];
 
   for (const group of groups.values()) {
     if (GENERIC_NAMES.has(group.series.toLowerCase())) {
@@ -251,11 +255,11 @@ export function groupManuals(
   );
 }
 
-/** Same as brand page: group + 80 % similar-name merge */
+/** Same as brand page: group + similar-name merge (default slightly looser than 0.8; IndraDrive also forced). */
 export function groupManualsAsOnSite(
   manuals: ManualWithCount[],
   brandName: string,
-  mergeThreshold = 0.8
-): SeriesGroup[] {
+  mergeThreshold = 0.75
+): SeriesGridGroup[] {
   return mergeSimilarSeriesGroups(groupManuals(manuals, brandName), mergeThreshold);
 }

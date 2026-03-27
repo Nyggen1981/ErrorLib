@@ -8,11 +8,11 @@ import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
 import type { Locale } from "@/lib/i18n";
 import type { Metadata } from "next";
+import { groupManualsAsOnSite } from "@/lib/brand-series-grouping";
 import {
-  groupManualsAsOnSite,
-  type ManualWithCount,
-  type SeriesGroup,
-} from "@/lib/brand-series-grouping";
+  buildSeriesDisplayMap,
+  displayTitleForSeries,
+} from "@/lib/series-display";
 
 type Props = {
   params: Promise<{ brandSlug: string }>;
@@ -97,11 +97,15 @@ export default async function BrandPage({ params, searchParams }: Props) {
         include: { _count: { select: { faultCodes: true } } },
         orderBy: { name: "asc" },
       },
+      seriesGroups: {
+        select: { seriesKey: true, displayName: true },
+      },
     },
   });
 
   if (!brand) notFound();
 
+  const seriesDisplay = buildSeriesDisplayMap(brand.seriesGroups);
   const groups = groupManualsAsOnSite(brand.manuals, brand.name);
   const totalCodes = groups.reduce((s, g) => s + g.totalCodes, 0);
 
@@ -111,6 +115,8 @@ export default async function BrandPage({ params, searchParams }: Props) {
       (g) => g.series.toLowerCase() === seriesFilter.toLowerCase()
     );
     if (!group) notFound();
+
+    const seriesTitle = displayTitleForSeries(group.series, seriesDisplay);
 
     const manualIds = group.manuals.map((m) => m.manual.id);
     const labelById = new Map(
@@ -189,13 +195,13 @@ export default async function BrandPage({ params, searchParams }: Props) {
           items={[
             { label: t("home", locale), href: "/" },
             { label: brand.name, href: `/${brand.slug}` },
-            { label: group.series },
+            { label: seriesTitle },
           ]}
         />
 
         <div className="mb-5">
           <h1 className="text-2xl font-bold tracking-tight text-technical-50 sm:text-3xl">
-            {brand.name} {group.series}
+            {brand.name} {seriesTitle}
           </h1>
           <p className="mt-1 text-sm text-technical-300">
             {codes.length}{" "}
@@ -235,6 +241,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {groups.map((group) => {
             const href = `/${brand.slug}?series=${encodeURIComponent(group.series)}`;
+            const boxTitle = displayTitleForSeries(group.series, seriesDisplay);
 
             return (
               <a
@@ -244,7 +251,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
               >
                 <div className="min-w-0">
                   <h2 className="text-lg font-bold tracking-tight text-technical-50 transition-colors group-hover:text-accent">
-                    {group.series}
+                    {boxTitle}
                   </h2>
                   <p className="mt-0.5 text-xs text-technical-400">
                     {group.manuals.length}{" "}

@@ -17,6 +17,8 @@
     "list-modules:flat": "npx tsx scripts/list-modules.ts --flat",
     "db:cleanup-orphan-codes": "npx tsx scripts/cleanup-orphan-fault-codes.ts",
     "db:cleanup-orphan-codes:execute": "npx tsx scripts/cleanup-orphan-fault-codes.ts --execute",
+    "db:backfill-series-display": "npx tsx scripts/backfill-series-display.ts",
+    "db:backfill-series-display:execute": "npx tsx scripts/backfill-series-display.ts --execute",
     "db:cleanup-brands": "npx tsx scripts/cleanup-brands-migration.ts",
     "db:cleanup-brands:execute": "npx tsx scripts/cleanup-brands-migration.ts --execute",
     "db:cleanup-db": "npx tsx scripts/cleanup-db.ts",
