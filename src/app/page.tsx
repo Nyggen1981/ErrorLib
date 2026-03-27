@@ -261,14 +261,12 @@ export default async function HomePage() {
                   <p className="mt-2 text-sm font-medium text-accent">
                     {card.modelHighlight ?? t("comingSoonNoModelYet", locale)}
                   </p>
-                  {card.totalVotes > 0 && (
+                  {card.totalVotes > 20 && (
                     <p className="mt-1.5 text-xs text-technical-400">
-                      {card.totalVotes === 1
-                        ? t("comingSoonVoteTotalOne", locale)
-                        : t("comingSoonVoteTotal", locale).replace(
-                            "{n}",
-                            String(card.totalVotes)
-                          )}
+                      {t("comingSoonVoteTotal", locale).replace(
+                        "{n}",
+                        String(card.totalVotes)
+                      )}
                     </p>
                   )}
                 </div>
