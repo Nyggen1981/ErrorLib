@@ -9,7 +9,7 @@ import {
 import { shouldSkipManual } from "../src/lib/industrial-filter.js";
 import { downloadPdf, ensureTempDir } from "./lib/download.js";
 import { extractDiagnosticText } from "./lib/pdf-parser.js";
-import { extractAndSave, extractWithOcr, preflight } from "./lib/extract.js";
+import { extractAndSave, extractWithOcr, preflight, sanitizeTitle } from "./lib/extract.js";
 import {
   upsertBrand,
   upsertManual,
@@ -75,6 +75,10 @@ type SavingsStats = {
   pagesFiltered: number;
   geminiCallsSaved: number;
 };
+
+function sanitizeTitleLocal(title: string): string {
+  return sanitizeTitle(title);
+}
 
 function newSavings(): SavingsStats {
   return {
@@ -161,10 +165,31 @@ async function fetchQueueBrands(): Promise<
   { id: string; brandName: string; force: boolean; manualId: string | null; targetManuals: string[] }[]
 > {
   const prisma = getPrisma();
-  return prisma.miningQueue.findMany({
-    where: { status: "pending" },
-    orderBy: { createdAt: "asc" },
-  });
+  try {
+    return await prisma.miningQueue.findMany({
+      where: { status: "pending" },
+      orderBy: { createdAt: "asc" },
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Backward compatibility: database may not yet have new columns (force/manualId).
+    if (msg.toLowerCase().includes("column") || msg.includes("P2022")) {
+      log.warn(
+        "[QUEUE] MiningQueue schema appears outdated (missing columns). Falling back to legacy queue mode."
+      );
+      const legacy = await prisma.$queryRaw<
+        { id: string; brandName: string; targetManuals: string[] }[]
+      >`SELECT "id", "brandName", "targetManuals" FROM "MiningQueue" WHERE "status" = 'pending' ORDER BY "createdAt" ASC`;
+      return legacy.map((q) => ({
+        id: q.id,
+        brandName: q.brandName,
+        targetManuals: Array.isArray(q.targetManuals) ? q.targetManuals : [],
+        force: false,
+        manualId: null,
+      }));
+    }
+    throw err;
+  }
 }
 
 async function setQueueStatus(
@@ -590,7 +615,9 @@ async function mine(
       continue;
     }
 
-    const manualName = await extractManualName(pdf.title, pdf.url, brand, existingNames);
+    const manualName = sanitizeTitleLocal(
+      await extractManualName(pdf.title, pdf.url, brand, existingNames)
+    );
     // CONSUMER_ELECTRONICS_SKIP from Gemini plus shouldSkipManual on resolved name (industrial-filter).
     if (isConsumerSkipManualName(manualName)) {
       log.warn(
@@ -683,7 +710,9 @@ async function mine(
         continue;
       }
 
-      const manualName = await extractManualName(dl.title, dl.url, brand, existingNames);
+      const manualName = sanitizeTitleLocal(
+        await extractManualName(dl.title, dl.url, brand, existingNames)
+      );
       if (isConsumerSkipManualName(manualName)) {
         log.warn(
           `  [OCR] Skipping out-of-scope (consumer / blocklist keywords in name): ${dl.title}`
@@ -899,7 +928,7 @@ async function runBrandList(
           brand,
           manual: "(all cached – retry exhausted)",
           codesFound: 0,
-          pagesScanned: 0,
+          pagesUsed: 0,
           durationMs: 0,
           status: "skipped",
         });

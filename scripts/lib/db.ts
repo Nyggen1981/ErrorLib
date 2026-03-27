@@ -1,7 +1,7 @@
 import { PrismaClient } from "../../generated/prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { log } from "./logger.js";
-import { washManualTitle } from "../../src/lib/manual-title-wash.js";
+import { sanitizeTitle } from "../../src/lib/manual-title-wash.js";
 
 let _prisma: PrismaClient | null = null;
 
@@ -25,8 +25,11 @@ export async function disconnect() {
 
 export function slugify(text: string): string {
   return text
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
     .replace(/(^-|-$)/g, "");
 }
 
@@ -47,7 +50,7 @@ export async function upsertManual(
   const prisma = getPrisma();
   // Single source of truth: stored name and slug always derive from washed title
   // (no leading [PDF]/Manual noise, no Greek letters in slug).
-  const cleanName = washManualTitle(name);
+  const cleanName = sanitizeTitle(name);
   const slug = slugify(cleanName);
   return prisma.manual.upsert({
     where: { slug },

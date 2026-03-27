@@ -115,6 +115,25 @@ function inferDescriptiveTagFromManualName(manualName: string): string {
   return "";
 }
 
+function inferShortTag(label: string, manualName: string): string {
+  const version = manualName.match(/\b(v(?:ersion)?\s*\d+(?:\.\d+)*)\b/i);
+  if (version) {
+    const v = version[1].replace(/\s+/g, "");
+    return v.toUpperCase().startsWith("V") ? v.toUpperCase() : `V${v}`;
+  }
+  const fw = manualName.match(/\bfirmware\b/i);
+  if (fw) return "Firmware";
+  const inferred = inferDescriptiveTagFromManualName(manualName);
+  if (inferred) return inferred;
+  // fallback to first compact token (keeps unique suffixes/series-like tags)
+  const compact = label
+    .split(/\s+/)
+    .map((w) => w.trim())
+    .filter(Boolean)
+    .find((w) => w.length >= 2 && w.length <= 20);
+  return compact ?? "";
+}
+
 export function extractSeries(manualName: string, brandName: string): string {
   const cleaned = washManualTitle(manualName);
   const stripped = cleaned
@@ -164,10 +183,19 @@ export function manualLabel(
     .replace(/\s+/g, " ")
     .trim();
 
+  // Tag refinement: remove noisy leading separators like "/36NHA4" or "-Firmware".
+  label = label.replace(/^[\/\\\-\u2013\u2014:,\s]+/, "").trim();
+
   const norm = label.replace(/\s+/g, " ").trim().toLowerCase();
   if (!label || label.length < 2 || norm === "general") {
     const inferred = inferDescriptiveTagFromManualName(cleanedName);
     return inferred;
+  }
+  if (
+    norm === cleanedName.trim().toLowerCase() ||
+    label.length > 20
+  ) {
+    return inferShortTag(label, cleanedName);
   }
   return label.charAt(0).toUpperCase() + label.slice(1);
 }

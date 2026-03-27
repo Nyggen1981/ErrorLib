@@ -5,7 +5,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { log } from "./logger.js";
 import { enqueueFaultCode, flushDbQueue, queueSize, slugify } from "./db.js";
 
-export { washManualTitle } from "../../src/lib/manual-title-wash.js";
+export { washManualTitle, sanitizeTitle } from "../../src/lib/manual-title-wash.js";
 
 export type ExtractedCode = {
   code: string;
@@ -24,6 +24,7 @@ type ExtractionContext = {
 type CategoryConfidence = "high" | "low";
 
 type CategorySlug =
+  | "general"
   | "electrical"
   | "communication"
   | "mechanical"
@@ -33,6 +34,7 @@ type CategorySlug =
   | "safety";
 
 const CATEGORY_SLUGS: CategorySlug[] = [
+  "general",
   "electrical",
   "communication",
   "mechanical",
@@ -216,7 +218,7 @@ function categorizeDescription(description: string): {
   if (/\b(mechanical|bearing|shaft|jam|stuck|vibration|brake)\b/i.test(d)) {
     return { slug: "mechanical", confidence: "high" };
   }
-  return { slug: "configuration", confidence: "low" };
+  return { slug: "general", confidence: "low" };
 }
 
 function parseCategorySlug(raw: string): CategorySlug | null {
@@ -234,7 +236,7 @@ async function resolveCategoryWithLlm(
   );
   const raw = result.response.text();
   const parsed = parseCategorySlug(raw);
-  return parsed ?? "configuration";
+  return parsed ?? "general";
 }
 
 async function enhanceFixStepsIfNeeded(

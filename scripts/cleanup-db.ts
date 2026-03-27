@@ -13,14 +13,17 @@ import "dotenv/config";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client.js";
-import { washManualTitle } from "../src/lib/manual-title-wash.js";
+import { sanitizeTitle } from "../src/lib/manual-title-wash.js";
 
 const EXECUTE = process.argv.includes("--execute");
 
 function slugify(text: string): string {
   return text
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
     .replace(/(^-|-$)/g, "");
 }
 
@@ -102,7 +105,7 @@ async function mergeFroniusSymoAdvanced(prisma: PrismaClient) {
 
   for (const m of manuals) {
     const newName = m.name.replace(/\bSymo\s+Advanced\s+User\b/gi, "Symo Advanced");
-    const baseSlug = slugify(washManualTitle(newName));
+    const baseSlug = slugify(sanitizeTitle(newName));
     const newSlug = await ensureUniqueManualSlug(prisma, baseSlug, m.id);
     console.log(
       `[Fronius] "${m.name.slice(0, 70)}${m.name.length > 70 ? "…" : ""}"\n         → name: "${newName.slice(0, 70)}…"\n         → slug: ${m.slug} → ${newSlug}`
@@ -130,7 +133,7 @@ async function washFanucManuals(prisma: PrismaClient) {
 
   let changed = 0;
   for (const m of manuals) {
-    const newName = washManualTitle(m.name);
+    const newName = sanitizeTitle(m.name);
     const baseSlug = slugify(newName);
     const newSlug = await ensureUniqueManualSlug(prisma, baseSlug, m.id);
     if (newName === m.name && newSlug === m.slug) continue;
@@ -155,12 +158,54 @@ async function washFanucManuals(prisma: PrismaClient) {
   }
 }
 
+async function sanitizeAllManualTitles(prisma: PrismaClient) {
+  const manuals = await prisma.manual.findMany({
+    select: { id: true, name: true, slug: true },
+  });
+  let changed = 0;
+  for (const m of manuals) {
+    const cleanName = sanitizeTitle(m.name);
+    if (!cleanName) {
+      console.log(
+        `[Manual Cleanup] ${m.slug}\n       name: "${m.name.slice(0, 72)}${m.name.length > 72 ? "…" : ""}"\n       → skipped (sanitized title became empty)`
+      );
+      continue;
+    }
+    const baseSlug = slugify(cleanName);
+    if (!baseSlug) {
+      console.log(
+        `[Manual Cleanup] ${m.slug}\n       name: "${m.name.slice(0, 72)}${m.name.length > 72 ? "…" : ""}"\n       → skipped (sanitized slug became empty)`
+      );
+      continue;
+    }
+    const newSlug = await ensureUniqueManualSlug(prisma, baseSlug, m.id);
+    if (cleanName === m.name && newSlug === m.slug) continue;
+    console.log(
+      `[Manual Cleanup] ${m.slug}\n       name: "${m.name.slice(0, 72)}${m.name.length > 72 ? "…" : ""}"\n       → "${cleanName.slice(0, 72)}${cleanName.length > 72 ? "…" : ""}"\n       slug → ${newSlug}`
+    );
+    changed++;
+    if (!EXECUTE) continue;
+    await prisma.manual.update({
+      where: { id: m.id },
+      data: { name: cleanName, slug: newSlug },
+    });
+  }
+  if (changed === 0) {
+    console.log("[Manual Cleanup] No global title/slug changes needed.");
+  } else if (EXECUTE) {
+    console.log(`[Manual Cleanup] Updated ${changed} manual(s).`);
+  } else {
+    console.log(`[Manual Cleanup] Dry-run: ${changed} manual(s) would be updated.`);
+  }
+}
+
 async function main() {
   console.log(EXECUTE ? "MODE: --execute (writing)\n" : "MODE: dry-run (no writes)\n");
 
   const { prisma, pool } = connect();
   try {
     logGroupingNote();
+    await sanitizeAllManualTitles(prisma);
     await mergeFroniusSymoAdvanced(prisma);
     await washFanucManuals(prisma);
     console.log("\nDone.");
