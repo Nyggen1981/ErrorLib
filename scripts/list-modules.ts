@@ -1,8 +1,9 @@
 /**
  * Lists brands and manuals from the database.
  *
- * Default: tree matching the brand page (series sub-categories + 80 % name merge).
+ * Default: tree matching the brand page (merge + SeriesGroup.displayName from Prisma when set).
  *   npx tsx scripts/list-modules.ts
+ *   npx tsx scripts/list-modules.ts --brand=bosch
  *
  * Flat list only (legacy):
  *   npx tsx scripts/list-modules.ts --flat
@@ -17,6 +18,8 @@ const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
 const flatOnly = process.argv.includes("--flat");
+const brandArg = process.argv.find((a) => a.startsWith("--brand="));
+const brandFilter = brandArg?.slice("--brand=".length).trim().toLowerCase() ?? "";
 
 function printFlatTree(brands: Awaited<ReturnType<typeof prisma.brand.findMany>>) {
   let grandManuals = 0;
@@ -51,7 +54,7 @@ function printSeriesTree(
   overrideByBrandId: Map<string, Map<string, string>>
 ) {
   console.log(
-    "=== Merker og underkategorier (kun aktive manualer; serie-merge + DB displayName) ===\n"
+    "=== Merker og underkategorier (aktive manualer; Prisma SeriesGroup.displayName når satt) ===\n"
   );
 
   let grandGroups = 0;
@@ -76,9 +79,11 @@ function printSeriesTree(
 
     const ov = overrideByBrandId.get(b.id) ?? new Map<string, string>();
     for (const g of groups) {
-      const shown = displayTitleForSeries(g.series, ov);
+      const fromDb = ov.get(g.series);
+      const shown = fromDb ?? g.series;
+      const dbTag = fromDb ? "  [displayName fra DB]" : "";
       console.log(
-        `\n   [${shown}]  —  ${g.manuals.length} manual(er), ${g.totalCodes} feilkoder`
+        `\n   [${shown}]${dbTag}  —  seriesKey="${g.series}"  —  ${g.manuals.length} manual(er), ${g.totalCodes} feilkoder`
       );
       for (const { manual, label } of g.manuals) {
         console.log(
@@ -123,10 +128,24 @@ async function main() {
     overrideByBrandId.get(o.brandId)!.set(o.seriesKey, d);
   }
 
+  const filtered =
+    brandFilter.length > 0
+      ? brands.filter(
+          (b) =>
+            b.slug.toLowerCase() === brandFilter ||
+            b.name.toLowerCase().includes(brandFilter)
+        )
+      : brands;
+
+  if (brandFilter.length > 0 && filtered.length === 0) {
+    console.error(`No brand matches --brand=${brandFilter}`);
+    process.exit(1);
+  }
+
   if (flatOnly) {
-    printFlatTree(brands);
+    printFlatTree(filtered);
   } else {
-    printSeriesTree(brands, overrideByBrandId);
+    printSeriesTree(filtered, overrideByBrandId);
   }
 }
 

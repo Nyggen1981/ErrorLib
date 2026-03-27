@@ -19,6 +19,8 @@
     "db:cleanup-orphan-codes:execute": "npx tsx scripts/cleanup-orphan-fault-codes.ts --execute",
     "db:backfill-series-display": "npx tsx scripts/backfill-series-display.ts",
     "db:backfill-series-display:execute": "npx tsx scripts/backfill-series-display.ts --execute",
+    "db:strip-ac-drives": "npx tsx scripts/strip-ac-drives-manual-names.ts",
+    "db:strip-ac-drives:execute": "npx tsx scripts/strip-ac-drives-manual-names.ts --execute",
     "db:cleanup-brands": "npx tsx scripts/cleanup-brands-migration.ts",
     "db:cleanup-brands:execute": "npx tsx scripts/cleanup-brands-migration.ts --execute",
     "db:cleanup-db": "npx tsx scripts/cleanup-db.ts",

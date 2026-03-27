@@ -3,7 +3,11 @@
  * fold generic buckets, then (in the app) mergeSimilarSeriesGroups is applied on top.
  */
 
-import { cleanSeriesTitle, washManualTitle } from "@/lib/manual-title-wash";
+import {
+  cleanSeriesTitle,
+  stripAcDrivesPhrase,
+  washManualTitle,
+} from "@/lib/manual-title-wash";
 import { mergeSimilarSeriesGroups } from "./mergeSimilarSeries";
 
 export type ManualWithCount = {
@@ -23,14 +27,13 @@ const SERIES_PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
   [/\b(ACS\d{3})/i, (m) => m[1].toUpperCase()],
   [/\b(AC500)/i, () => "AC500"],
   [/\b(AX\d{4})/i, (m) => m[1].toUpperCase()],
-  [/\b(PowerFlex)\s*(\d+)/i, (m) => `PowerFlex ${m[2]}`],
+  [/\bPowerFlex\s*4\s*\/\s*40\b/i, () => "PowerFlex 4 / 40"],
+  [/\b(PowerFlex)\s*(\d+[A-Za-z]?)\b/i, (m) => `PowerFlex ${m[2]}`],
   [/\b(VLT)\s+([\w-]+)/i, (m) => `VLT ${m[2]}`],
   [/\b(FC\s*\d{2,3})/i, (m) => m[1].replace(/\s+/g, "").toUpperCase()],
   [/\b(SINAMICS)\s+(\w+)/i, (m) => `SINAMICS ${m[2]}`],
   [/\b(SINUMERIK)\s+(\w+)/i, (m) => `SINUMERIK ${m[2]}`],
   [/\b(MOVIDRIVE)\b/i, () => "MOVIDRIVE"],
-  [/\b(IndraDrive)\s+([A-Za-z0-9][\w.-]*)\b/i, (m) => `IndraDrive ${m[2]}`],
-  [/\b(IndraDrive)\b/i, () => "IndraDrive"],
   [/\b(MOVIFIT)\b/i, () => "MOVIFIT"],
   [/\b(MCBSM)\b/i, () => "MCBSM"],
   [/\b(Altivar|ALTIVAR|ATV)\s*(\d+)/i, (m) => `Altivar ${m[2]}`],
@@ -145,20 +148,34 @@ export function extractSeries(manualName: string, brandName: string): string {
     )
     .trim();
 
+  const forSeries = stripAcDrivesPhrase(stripped);
+
   const brandNorm = brandName.trim();
-  if (/^huawei$/i.test(brandNorm) && /\bSUN2000\b/i.test(stripped)) {
+  if (/^huawei$/i.test(brandNorm) && /\bSUN2000\b/i.test(forSeries)) {
     return cleanSeriesTitle("SUN2000 Series");
   }
-  if (/^sma$/i.test(brandNorm) && /\bSunny\s+Boy\b/i.test(stripped)) {
+  if (/^sma$/i.test(brandNorm) && /\bSunny\s+Boy\b/i.test(forSeries)) {
     return cleanSeriesTitle("Sunny Boy Series");
   }
 
+  // One public grid box for all Rexroth IndraDrive family manuals.
+  if (/\bindra\s*drive\b/i.test(forSeries)) {
+    return cleanSeriesTitle("IndraDrive");
+  }
+  // Bosch/Rexroth MPx* lines without "IndraDrive" spelled in the title still belong with IndraDrive.
+  if (
+    /\b(bosch|rexroth)\b/i.test(brandNorm) &&
+    /\bMP[xX]?\d/i.test(forSeries)
+  ) {
+    return cleanSeriesTitle("IndraDrive");
+  }
+
   for (const [pattern, extract] of SERIES_PATTERNS) {
-    const match = stripped.match(pattern);
+    const match = forSeries.match(pattern);
     if (match) return cleanSeriesTitle(extract(match));
   }
 
-  const words = stripped.split(/\s+/);
+  const words = forSeries.split(/\s+/);
   const lead = words
     .slice(0, 3)
     .filter((w) => /^[A-Z0-9]/.test(w) && w.length >= 2 && !PART_NUMBER_RE.test(w));

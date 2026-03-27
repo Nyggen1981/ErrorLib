@@ -52,6 +52,22 @@ function stripLeadingNoise(s: string): string {
   return t;
 }
 
+/** Remove trailing "AC Drive(s)" noise from product lines (e.g. PowerFlex). */
+export function stripAcDrivesPhrase(s: string): string {
+  return s
+    .replace(/\bAC\s+Drives?\b/gi, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** Allen-Bradley combined catalog → single series label. */
+export function normalizePowerFlexCompound(s: string): string {
+  return s.replace(
+    /\bPowerFlex\s*4\s+and\s+PowerFlex\s*40\b/gi,
+    "PowerFlex 4 / 40"
+  );
+}
+
 /** Collapse consecutive duplicate words (case-insensitive), e.g. "Drive Drive" → "Drive". */
 export function deduplicateAdjacentWords(title: string): string {
   const parts = title.trim().split(/\s+/).filter(Boolean);
@@ -65,7 +81,13 @@ export function deduplicateAdjacentWords(title: string): string {
     }
     out.push(w);
   }
-  return out.join(" ");
+  let s = out.join(" ");
+  // Redundant standalone "Drive" after a token that already ends with "drive" (e.g. IndraDrive Drive).
+  s = s.replace(/\b(\S*?[dD]rive)\s+Drive\b(?=\s|$)/gi, "$1");
+  s = s.replace(/\bDrive\s+Drive\b/gi, "Drive");
+  // Explicit Bosch/Rexroth line
+  s = s.replace(/\bindra\s*drive\s+drive\b/gi, "IndraDrive");
+  return s.replace(/\s+/g, " ").trim();
 }
 
 const INDUSTRY_TAIL = [
@@ -112,7 +134,8 @@ export function deduplicateTerms(title: string): string {
 
 /** Title cleanup for series keys and miner output (adjacent dupes + redundant industry tails). */
 export function cleanSeriesTitle(title: string): string {
-  return deduplicateTerms(deduplicateAdjacentWords(title.trim()));
+  const t = normalizePowerFlexCompound(stripAcDrivesPhrase(title.trim()));
+  return deduplicateTerms(deduplicateAdjacentWords(t));
 }
 
 export function washManualTitle(raw: string): string {
@@ -129,7 +152,7 @@ export function washManualTitle(raw: string): string {
   // Fanuc-style "αi" / "βi" product lines → spaced Latin (after single-letter Greek → word replace)
   s = s.replace(/\bAlphai\b/gi, "Alpha i");
   s = s.replace(/\bBetai\b/gi, "Beta i");
-  return s.trim();
+  return normalizePowerFlexCompound(stripAcDrivesPhrase(s.trim()));
 }
 
 /** Canonical title sanitizer used by miner + cleanup scripts */

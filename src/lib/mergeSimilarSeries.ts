@@ -77,27 +77,30 @@ export function seriesNameSimilarity(a: string, b: string): number {
   return Math.max(l1, l2);
 }
 
-function bothStartWithIndraDrive(a: string, b: string): boolean {
-  return /^\s*indra\s*drive\b/i.test(a) && /^\s*indra\s*drive\b/i.test(b);
+/** Any title that names the IndraDrive product line (surviving split keys, legacy data, etc.). */
+function mentionsIndraDriveLine(s: string): boolean {
+  return /\bindra\s*drive\b/i.test(s.trim());
 }
 
-/** Both strings carry a 3–6 digit model number and the largest differs by ≥5× from the smallest (≥100). */
-function radicallyDifferentIndraDriveModels(a: string, b: string): boolean {
-  const nums = (s: string) =>
-    (s.match(/\b\d{3,6}\b/g) ?? []).map((x) => parseInt(x, 10));
-  const all = [...nums(a), ...nums(b)];
-  if (all.length === 0) return false;
-  const lo = Math.min(...all);
-  const hi = Math.max(...all);
-  if (lo < 100) return false;
-  return hi / lo >= 5;
+/**
+ * Other Rexroth "Indra*" families are not the same grid bucket as IndraDrive unless both name Drive.
+ */
+function isConflictingIndraFamily(a: string, b: string): boolean {
+  const other = /\bindra(works|dyn|motion|control)\b/i;
+  const hasDrive = (s: string) => mentionsIndraDriveLine(s);
+  const hasOther = (s: string) => other.test(s) && !mentionsIndraDriveLine(s);
+  return (
+    (hasDrive(a) && hasOther(b)) ||
+    (hasDrive(b) && hasOther(a))
+  );
 }
 
 function shouldMergeSeriesNames(a: string, b: string, threshold: number): boolean {
   if (seriesNameSimilarity(a, b) >= threshold) return true;
   if (
-    bothStartWithIndraDrive(a, b) &&
-    !radicallyDifferentIndraDriveModels(a, b)
+    mentionsIndraDriveLine(a) &&
+    mentionsIndraDriveLine(b) &&
+    !isConflictingIndraFamily(a, b)
   ) {
     return true;
   }
