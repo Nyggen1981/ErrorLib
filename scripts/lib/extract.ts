@@ -243,6 +243,9 @@ async function enhanceFixStepsIfNeeded(
 ): Promise<string[]> {
   const cleaned = normalizeList(fc.fixSteps);
   if (cleaned.length >= 2) return cleaned.slice(0, 6);
+  log.warn(
+    `    [ENHANCE] ${fc.code}: fixSteps too short (${cleaned.length}), requesting enhancement prompt`
+  );
   try {
     const model = getGemini().getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `You are a senior service engineer.\nKontekst: Feilkode: ${fc.code}, Navn: ${fc.title}, Beskrivelse: ${fc.description}, Utstyr: ${context?.brandName ?? "unknown"} ${context?.manualName ?? "unknown"}.\nIf the source text lacks specific repair steps for ${context?.brandName ?? "the equipment"} ${fc.code}, use your internal technical knowledge to generate 3-5 logical, professional troubleshooting steps based on the fault description.\nSafety: prioritize non-destructive checks (verify wiring, measure voltage/current, check parameters, inspect mechanical blockage, insulation checks where relevant). Do not guess internal component repair.\nReturn ONLY valid JSON array of strings.`;
@@ -259,6 +262,9 @@ async function enhanceFixStepsIfNeeded(
   } catch {
     /* keep original if enhancement fails */
   }
+  log.warn(
+    `    [ENHANCE] ${fc.code}: enhancement failed or still insufficient fixSteps`
+  );
   return cleaned.slice(0, 6);
 }
 

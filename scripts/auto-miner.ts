@@ -158,7 +158,7 @@ async function resetStaleQueueItems(): Promise<void> {
 }
 
 async function fetchQueueBrands(): Promise<
-  { id: string; brandName: string; targetManuals: string[] }[]
+  { id: string; brandName: string; force: boolean; manualId: string | null; targetManuals: string[] }[]
 > {
   const prisma = getPrisma();
   return prisma.miningQueue.findMany({
@@ -204,12 +204,143 @@ async function getBrandFaultCount(brand: string): Promise<number> {
   return brandRec.manuals.reduce((sum, m) => sum + m._count.faultCodes, 0);
 }
 
+function parseQueueTargets(rawTargets?: string[]): {
+  isForceRetry: boolean;
+  shouldOverwrite: boolean;
+  manualIds: string[];
+  targetManuals?: string[];
+} {
+  const entries = rawTargets ?? [];
+  const isForceRetry = entries.includes("__FORCE_RETRY__");
+  const shouldOverwrite = entries.includes("__OVERWRITE__");
+  const manualIds = entries
+    .filter((t) => t.startsWith("__MANUAL_ID__:"))
+    .map((t) => t.replace("__MANUAL_ID__:", "").trim())
+    .filter(Boolean);
+  const targetManuals = entries.filter((t) => !t.startsWith("__"));
+  return {
+    isForceRetry,
+    shouldOverwrite,
+    manualIds,
+    targetManuals: targetManuals.length > 0 ? targetManuals : undefined,
+  };
+}
+
+async function mineSpecificManual(
+  brand: string,
+  manualId: string,
+  shouldOverwrite: boolean
+): Promise<number> {
+  const prisma = getPrisma();
+  const manual = await prisma.manual.findUnique({
+    where: { id: manualId },
+    include: { brand: true },
+  });
+  if (!manual) {
+    log.warn(`[MANUAL RETRY] Manual ${manualId} not found`);
+    return 0;
+  }
+  if (!manual.pdfUrl) {
+    log.warn(`[MANUAL RETRY] ${manual.name} has no PDF URL`);
+    return 0;
+  }
+
+  const effectiveBrand = manual.brand.name || brand;
+  const filename = `${effectiveBrand.toLowerCase().replace(/\s+/g, "-")}_${manual.slug}.pdf`;
+  log.step("🔁", `[MANUAL RETRY] ${manual.name} (${manual.id})`);
+
+  await prisma.miningLog.deleteMany({
+    where: {
+      brand: effectiveBrand,
+      manual: manual.name,
+    },
+  });
+
+  await createMiningLog({
+    brand: effectiveBrand,
+    manual: manual.name,
+    codesFound: 0,
+    pagesUsed: 0,
+    durationMs: 0,
+    status: "started",
+    message: `Manual force retry (overwrite=${shouldOverwrite})`,
+  });
+
+  const start = Date.now();
+  const pdfPath = await downloadPdf(manual.pdfUrl, filename);
+  if (!pdfPath) {
+    await createMiningLog({
+      brand: effectiveBrand,
+      manual: manual.name,
+      codesFound: 0,
+      pagesUsed: 0,
+      durationMs: Date.now() - start,
+      status: "failed",
+      message: "Failed to download PDF",
+    });
+    return 0;
+  }
+
+  if (shouldOverwrite) {
+    const deleted = await prisma.faultCode.deleteMany({
+      where: {
+        manualId: manual.id,
+        OR: [
+          { code: "" },
+          { title: "" },
+          { description: "" },
+          { fixSteps: { isEmpty: true } },
+        ],
+      },
+    });
+    log.warn(`  [MANUAL RETRY] Force cleanup removed ${deleted.count} empty fault code row(s)`);
+  }
+
+  const scan = await extractDiagnosticText(pdfPath, MAX_PAGES_PER_PDF);
+  let count = 0;
+  if (scan.pages.length > 0) {
+    count = await extractAndSave(scan.pages, manual.id, manual.pdfUrl, {
+      brandName: effectiveBrand,
+      manualName: manual.name,
+    });
+  }
+  if (count === 0) {
+    log.info("  [MANUAL RETRY] Text extraction empty, trying OCR fallback...");
+    count = await extractWithOcr(pdfPath, manual.id, manual.pdfUrl, {
+      brandName: effectiveBrand,
+      manualName: manual.name,
+    });
+  }
+
+  markCompleted(filename, manual.pdfUrl, effectiveBrand, count);
+  await createMiningLog({
+    brand: effectiveBrand,
+    manual: manual.name,
+    codesFound: count,
+    pagesUsed: scan.pages.length,
+    durationMs: Date.now() - start,
+    status: count > 0 ? "success" : "empty",
+    message: count > 0 ? "Manual force retry completed" : "No codes found on manual force retry",
+  });
+  return count;
+}
+
 async function mine(
   brand: string,
   force: boolean,
   savings: SavingsStats,
-  targetManuals?: string[]
+  targetManuals?: string[],
+  manualIds?: string[],
+  shouldOverwrite = false
 ): Promise<number> {
+  if (manualIds && manualIds.length > 0) {
+    let total = 0;
+    for (const manualId of manualIds) {
+      total += await mineSpecificManual(brand, manualId, shouldOverwrite);
+    }
+    return total;
+  }
+
   const startTime = Date.now();
   log.banner(`MINING RIG - ${brand.toUpperCase()}`);
 
@@ -629,11 +760,13 @@ async function mineWithRetry(
   force: boolean,
   savings: SavingsStats,
   maxRetries = 3,
-  targetManuals?: string[]
+  targetManuals?: string[],
+  manualIds?: string[],
+  shouldOverwrite = false
 ): Promise<number> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await mine(brand, force, savings, targetManuals);
+      return await mine(brand, force, savings, targetManuals, manualIds, shouldOverwrite);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
 
@@ -666,7 +799,7 @@ async function mineWithRetry(
 async function runBrandList(
   brands: string[],
   force: boolean,
-  queueIds?: Map<string, string>,
+  queueIds?: Map<string, string[]>,
   queueTargets?: Map<string, string[]>
 ) {
   const globalStart = Date.now();
@@ -694,11 +827,13 @@ async function runBrandList(
 
   for (let i = 0; i < brands.length; i++) {
     const brand = brands[i];
-    const queueId = queueIds?.get(brand);
+    const queueIdGroup = queueIds?.get(brand) ?? [];
     const rawTargets = queueTargets?.get(brand);
-    const isForceRetry = rawTargets?.includes("__FORCE_RETRY__") ?? false;
-    const targets = isForceRetry ? undefined : rawTargets;
+    const parsedTargets = parseQueueTargets(rawTargets);
+    const isForceRetry = parsedTargets.isForceRetry;
+    const targets = isForceRetry ? undefined : parsedTargets.targetManuals;
     const isExpand = targets && targets.length > 0;
+    const hasManualIds = parsedTargets.manualIds.length > 0;
 
     if (brands.length > 1) {
       log.banner(`BRAND ${i + 1}/${brands.length}: ${brand.toUpperCase()}`);
@@ -709,9 +844,14 @@ async function runBrandList(
     } else if (isExpand) {
       log.info(`[EXPAND] Targeted mining for: ${targets.join(", ")}`);
     }
+    if (hasManualIds) {
+      log.info(`[MANUAL RETRY] ${parsedTargets.manualIds.length} manual(s), overwrite=${parsedTargets.shouldOverwrite}`);
+    }
 
-    if (queueId) {
-      await setQueueStatus(queueId, "processing");
+    if (queueIdGroup.length > 0) {
+      for (const queueId of queueIdGroup) {
+        await setQueueStatus(queueId, "processing");
+      }
       log.info(`Queue status -> processing`);
     }
 
@@ -729,12 +869,24 @@ async function runBrandList(
         status: "skipped",
         message: "Brand already completed — use --force to re-mine",
       });
-      if (queueId) await deleteQueueItem(queueId);
+      if (queueIdGroup.length > 0) {
+        for (const queueId of queueIdGroup) {
+          await deleteQueueItem(queueId);
+        }
+      }
       continue;
     }
 
     try {
-      const count = await mineWithRetry(brand, force, savings, 3, targets);
+      const count = await mineWithRetry(
+        brand,
+        force,
+        savings,
+        3,
+        targets,
+        parsedTargets.manualIds,
+        parsedTargets.shouldOverwrite
+      );
       totalCodes += count;
       results.push({
         brand,
@@ -767,8 +919,10 @@ async function runBrandList(
         }
       }
 
-      if (queueId) {
-        await setQueueStatus(queueId, "completed");
+      if (queueIdGroup.length > 0) {
+        for (const queueId of queueIdGroup) {
+          await setQueueStatus(queueId, "completed");
+        }
         log.info(`Queue status -> completed`);
       }
     } catch (err) {
@@ -776,8 +930,10 @@ async function runBrandList(
       log.error(`Fatal error mining ${brand}: ${msg}`);
       results.push({ brand, codes: 0, status: "FAILED" });
 
-      if (queueId) {
-        await setQueueStatus(queueId, "completed");
+      if (queueIdGroup.length > 0) {
+        for (const queueId of queueIdGroup) {
+          await setQueueStatus(queueId, "completed");
+        }
       }
     }
 
@@ -885,12 +1041,22 @@ async function main() {
 
       process.stdout.write("\r" + " ".repeat(70) + "\r");
 
-      const brands = queueItems.map((q) => q.brandName);
-      const queueIds = new Map(queueItems.map((q) => [q.brandName, q.id]));
+      const grouped = new Map<string, { ids: string[]; targetManuals: string[] }>();
+      for (const q of queueItems) {
+        const current = grouped.get(q.brandName) ?? { ids: [], targetManuals: [] };
+        current.ids.push(q.id);
+        current.targetManuals.push(...q.targetManuals);
+        if (q.force) current.targetManuals.push("__FORCE_RETRY__");
+        if (q.manualId) current.targetManuals.push(`__MANUAL_ID__:${q.manualId}`);
+        if (q.force && q.manualId) current.targetManuals.push("__OVERWRITE__");
+        grouped.set(q.brandName, current);
+      }
+      const brands = [...grouped.keys()];
+      const queueIds = new Map([...grouped.entries()].map(([brandName, v]) => [brandName, v.ids]));
       const queueTargets = new Map(
-        queueItems
-          .filter((q) => q.targetManuals.length > 0)
-          .map((q) => [q.brandName, q.targetManuals])
+        [...grouped.entries()]
+          .filter(([, v]) => v.targetManuals.length > 0)
+          .map(([brandName, v]) => [brandName, [...new Set(v.targetManuals)]])
       );
 
       log.info(`Found ${queueItems.length} pending brand(s): ${brands.join(", ")}`);

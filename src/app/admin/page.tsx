@@ -28,8 +28,10 @@ export default async function AdminPage() {
     brands,
     recentFaults,
     miningLogs,
+    allMiningLogs,
     queueItems,
     userRequests,
+    manuals,
   ] = await Promise.all([
     prisma.brand.count(),
     prisma.manual.count(),
@@ -56,12 +58,29 @@ export default async function AdminPage() {
       take: 20,
       orderBy: { createdAt: "desc" },
     }),
+    prisma.miningLog.findMany({
+      take: 5000,
+      orderBy: { createdAt: "desc" },
+      select: {
+        brand: true,
+        manual: true,
+        status: true,
+        createdAt: true,
+      },
+    }),
     prisma.miningQueue.findMany({
       orderBy: { createdAt: "asc" },
     }),
     prisma.userRequest.findMany({
       orderBy: [{ voteCount: "desc" }, { createdAt: "desc" }],
       take: 50,
+    }),
+    prisma.manual.findMany({
+      include: {
+        brand: true,
+        _count: { select: { faultCodes: true } },
+      },
+      orderBy: [{ brand: { name: "asc" } }, { name: "asc" }],
     }),
   ]);
 
@@ -109,6 +128,37 @@ export default async function AdminPage() {
     createdAt: r.createdAt.toISOString(),
   }));
 
+  const latestByBrandManual = new Map<string, { status: string; createdAt: Date }>();
+  for (const l of allMiningLogs) {
+    const key = `${l.brand.toLowerCase()}::${l.manual.toLowerCase()}`;
+    if (!latestByBrandManual.has(key)) {
+      latestByBrandManual.set(key, { status: l.status, createdAt: l.createdAt });
+    }
+  }
+
+  const manualControlData = manuals.map((m) => {
+    const key = `${m.brand.name.toLowerCase()}::${m.name.toLowerCase()}`;
+    const latest = latestByBrandManual.get(key);
+    const mappedStatus =
+      latest?.status === "success"
+        ? "success"
+        : latest?.status === "empty"
+          ? "empty"
+          : latest && ["failed", "aborted"].includes(latest.status)
+            ? "error"
+            : "never";
+    return {
+      id: m.id,
+      brandName: m.brand.name,
+      brandSlug: m.brand.slug,
+      manualName: m.name,
+      manualSlug: m.slug,
+      faultCodes: m._count.faultCodes,
+      status: mappedStatus as "success" | "empty" | "error" | "never",
+      lastMined: latest?.createdAt.toISOString() ?? null,
+    };
+  });
+
   return (
     <AdminDashboard
       stats={{ brandCount, manualCount, faultCount }}
@@ -117,6 +167,7 @@ export default async function AdminPage() {
       miningLogs={miningLogData}
       queue={queueData}
       userRequests={userRequestData}
+      manuals={manualControlData}
     />
   );
 }

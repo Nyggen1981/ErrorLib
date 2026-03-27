@@ -93,10 +93,110 @@ export async function POST(req: NextRequest) {
   if (!authed) return unauthorized();
 
   const body = await req.json();
-  const { brand, massRetry } = body as {
+  const { brand, massRetry, manualId, manualIds, force } = body as {
     brand?: string;
     massRetry?: boolean;
+    manualId?: string;
+    manualIds?: string[];
+    force?: boolean;
   };
+
+  if (manualId || (Array.isArray(manualIds) && manualIds.length > 0)) {
+    const ids = Array.from(
+      new Set(
+        [
+          ...(manualId ? [manualId] : []),
+          ...((manualIds ?? []).filter(Boolean)),
+        ].map((s) => s.trim())
+      )
+    );
+    if (ids.length === 0) {
+      return NextResponse.json({ error: "manualId/manualIds is required" }, { status: 400 });
+    }
+
+    const manuals = await prisma.manual.findMany({
+      where: { id: { in: ids } },
+      include: { brand: true },
+    });
+    const manualById = new Map(manuals.map((m) => [m.id, m]));
+
+    const queuedItems: {
+      brandName: string;
+      status: string;
+      force: boolean;
+      manualId: string;
+      targetManuals: string[];
+    }[] = [];
+    let cleanedEmptyCodes = 0;
+    let clearedLogs = 0;
+    for (const id of ids) {
+      const manual = manualById.get(id);
+      if (!manual) continue;
+
+      // Smart retry: remove known "empty/incomplete" code rows before re-mining this manual.
+      const cleanup = await prisma.faultCode.deleteMany({
+        where: {
+          manualId: manual.id,
+          OR: [
+            { code: "" },
+            { title: "" },
+            { description: "" },
+            { fixSteps: { isEmpty: true } },
+          ],
+        },
+      });
+      cleanedEmptyCodes += cleanup.count;
+
+      const clear = await prisma.miningLog.deleteMany({
+        where: {
+          brand: manual.brand.name,
+          manual: manual.name,
+        },
+      });
+      clearedLogs += clear.count;
+
+      const token = `__MANUAL_ID__:${manual.id}`;
+      const existing = await prisma.miningQueue.findFirst({
+        where: {
+          brandName: { equals: manual.brand.name, mode: "insensitive" },
+          status: { in: ["pending", "processing"] },
+          targetManuals: { has: token },
+        },
+      });
+      if (existing) continue;
+
+      const payload = [token, "__FORCE_RETRY__"];
+      if (force !== false) payload.push("__OVERWRITE__");
+
+      queuedItems.push({
+        brandName: manual.brand.name,
+        status: "pending",
+        force: force !== false,
+        manualId: manual.id,
+        targetManuals: payload,
+      });
+    }
+
+    if (queuedItems.length === 0) {
+      return NextResponse.json({
+        queued: 0,
+        message: "All selected manuals are already queued or invalid.",
+      });
+    }
+
+    const created = await prisma.miningQueue.createMany({ data: queuedItems });
+    return NextResponse.json(
+      {
+        queued: created.count,
+        manualIds: ids,
+        force: force !== false,
+        cleanedEmptyCodes,
+        clearedLogs,
+        message: `Queued ${created.count} manual retry job(s) (cleaned ${cleanedEmptyCodes} empty code row(s), cleared ${clearedLogs} old log row(s)).`,
+      },
+      { status: 201 }
+    );
+  }
 
   if (massRetry) {
     const allLogs = await prisma.miningLog.findMany({
@@ -131,6 +231,7 @@ export async function POST(req: NextRequest) {
       data: toQueue.map((b) => ({
         brandName: b,
         status: "pending",
+        force: true,
         targetManuals: ["__FORCE_RETRY__"],
       })),
     });
@@ -172,6 +273,7 @@ export async function POST(req: NextRequest) {
     data: {
       brandName: name,
       status: "pending",
+      force: true,
       targetManuals: ["__FORCE_RETRY__"],
     },
   });

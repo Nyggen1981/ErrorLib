@@ -22,6 +22,17 @@ type QueueEntry = {
   createdAt: string;
 };
 
+type ManualControlEntry = {
+  id: string;
+  brandName: string;
+  brandSlug: string;
+  manualName: string;
+  manualSlug: string;
+  faultCodes: number;
+  status: "success" | "empty" | "error" | "never";
+  lastMined: string | null;
+};
+
 type UserRequestEntry = {
   id: string;
   brand: string;
@@ -54,6 +65,7 @@ type Props = {
   miningLogs: MiningLogEntry[];
   queue: QueueEntry[];
   userRequests: UserRequestEntry[];
+  manuals: ManualControlEntry[];
 };
 
 function StatCard({
@@ -314,6 +326,214 @@ function MassRetryButton({ logs }: { logs: MiningLogEntry[] }) {
         ? "Queuing..."
         : `⛏️ Retry All Failed/Empty (${failedBrands.length} brands)`}
     </button>
+  );
+}
+
+function ManualControlCenter({ manuals }: { manuals: ManualControlEntry[] }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [filterMode, setFilterMode] = useState<"all" | "targets">("all");
+
+  const visibleManuals = manuals.filter((m) =>
+    filterMode === "targets" ? m.faultCodes === 0 || m.status === "empty" : true
+  );
+
+  const grouped = visibleManuals.reduce<Record<string, ManualControlEntry[]>>((acc, m) => {
+    if (!acc[m.brandName]) acc[m.brandName] = [];
+    acc[m.brandName].push(m);
+    return acc;
+  }, {});
+
+  const emptyManualIds = visibleManuals
+    .filter((m) => m.status === "empty")
+    .map((m) => m.id);
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllEmpty() {
+    setSelected((prev) => {
+      const allSelected = emptyManualIds.every((id) => prev.has(id));
+      if (allSelected) return new Set([...prev].filter((id) => !emptyManualIds.includes(id)));
+      const next = new Set(prev);
+      emptyManualIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }
+
+  async function retryOne(id: string) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/admin/retry-mining", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manualId: id, force: true }),
+      });
+      const data = await res.json();
+      if (res.ok) setMessage(data.message ?? "Manual queued for retry");
+      else setMessage(data.error ?? "Failed to queue manual retry");
+    } catch {
+      setMessage("Network error while queueing retry");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function retrySelected() {
+    if (selected.size === 0) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/admin/retry-mining", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manualIds: Array.from(selected), force: true }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(data.message ?? `Queued ${data.queued ?? 0} manual retries`);
+      } else {
+        setMessage(data.error ?? "Failed to queue manual retries");
+      }
+    } catch {
+      setMessage("Network error while queueing manual retries");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const statusClass: Record<ManualControlEntry["status"], string> = {
+    success: "bg-success/20 text-success",
+    empty: "bg-warning/20 text-warning",
+    error: "bg-danger/20 text-danger",
+    never: "bg-technical-700 text-technical-300",
+  };
+
+  return (
+    <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-white">Manual Control Center</h2>
+        <div className="flex items-center gap-2">
+          <select
+            value={filterMode}
+            onChange={(e) => setFilterMode(e.target.value as "all" | "targets")}
+            className="rounded border border-technical-600 bg-technical-900 px-2 py-1.5 text-xs text-technical-200"
+          >
+            <option value="all">All manuals</option>
+            <option value="targets">Only empty / 0 codes</option>
+          </select>
+          <button
+            onClick={toggleSelectAllEmpty}
+            className="rounded bg-technical-700 px-3 py-1.5 text-xs text-technical-200 hover:bg-technical-600"
+          >
+            Select all empty ({emptyManualIds.length})
+          </button>
+          <button
+            onClick={retrySelected}
+            disabled={busy || selected.size === 0}
+            className="rounded bg-warning/20 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/30 disabled:opacity-50"
+          >
+            {busy ? "Queuing..." : `Retry selected (${selected.size})`}
+          </button>
+        </div>
+      </div>
+      {message && <p className="mb-3 text-xs text-technical-300">{message}</p>}
+      <div className="max-h-[460px] overflow-auto">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-technical-700 text-technical-400">
+              <th className="pb-2 pr-3"></th>
+              <th className="pb-2 pr-3 font-medium">Brand / Manual</th>
+              <th className="pb-2 pr-3 font-medium">Status</th>
+              <th className="pb-2 pr-3 font-medium text-right">Codes</th>
+              <th className="pb-2 pr-3 font-medium">Last mined</th>
+              <th className="pb-2 font-medium text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-technical-700/50">
+            {Object.entries(grouped).map(([brandName, items]) => (
+              items.map((m, idx) => (
+                <tr key={m.id} className="text-technical-300">
+                  <td className="py-2 pr-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(m.id)}
+                      onChange={() => toggleSelect(m.id)}
+                      className="h-4 w-4 accent-warning"
+                    />
+                  </td>
+                  <td className="py-2 pr-3">
+                    <div className="font-medium text-technical-200">
+                      {idx === 0 ? brandName : ""}
+                    </div>
+                    <div className="text-xs text-technical-500">{m.manualName}</div>
+                  </td>
+                  <td className="py-2 pr-3">
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${statusClass[m.status]}`}>
+                      {m.status}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{m.faultCodes}</td>
+                  <td className="py-2 pr-3 text-xs text-technical-500">
+                    {m.lastMined ? timeAgo(m.lastMined) : "never"}
+                  </td>
+                  <td className="py-2 text-right">
+                    <button
+                      onClick={() => retryOne(m.id)}
+                      disabled={busy}
+                      className="rounded bg-warning/20 px-2 py-1 text-xs text-warning hover:bg-warning/30 disabled:opacity-50"
+                    >
+                      Force Re-mine
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ClearMiningLogButton() {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function clearLogs() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/mining-log", { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok) setMsg(`Cleared ${data.deleted ?? 0} log rows`);
+      else setMsg(data.error ?? "Failed to clear log");
+    } catch {
+      setMsg("Network error while clearing log");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={clearLogs}
+        disabled={busy}
+        className="rounded bg-danger/20 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/30 disabled:opacity-50"
+      >
+        {busy ? "Clearing..." : "Clear Mining Log"}
+      </button>
+      {msg && <span className="text-xs text-technical-400">{msg}</span>}
+    </div>
   );
 }
 
@@ -1774,6 +1994,7 @@ export function AdminDashboard({
   miningLogs,
   queue,
   userRequests,
+  manuals,
 }: Props) {
   const router = useRouter();
   const [lastRefresh, setLastRefresh] = useState(Date.now());
@@ -1875,7 +2096,10 @@ export function AdminDashboard({
         <div className="rounded-xl border border-technical-700 bg-technical-800 p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-white">Mining Log</h2>
-            <MassRetryButton logs={miningLogs} />
+            <div className="flex items-center gap-3">
+              <MassRetryButton logs={miningLogs} />
+              <ClearMiningLogButton />
+            </div>
           </div>
           {miningLogs.length > 0 ? (
             <div className="overflow-x-auto">
@@ -1887,6 +2111,10 @@ export function AdminDashboard({
             </p>
           )}
         </div>
+      </div>
+
+      <div className="mb-8">
+        <ManualControlCenter manuals={manuals} />
       </div>
 
       {/* Link Health + Google Indexing */}

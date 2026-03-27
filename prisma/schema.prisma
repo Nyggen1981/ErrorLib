@@ -73,11 +73,14 @@ model MiningQueue {
   id            String   @id @default(cuid())
   brandName     String
   status        String   @default("pending")
+  force         Boolean  @default(false)
+  manualId      String?
   targetManuals String[] @default([])
   createdAt     DateTime @default(now())
 
   @@index([status])
   @@index([createdAt])
+  @@index([manualId])
 }
 
 model SiteSetting {
