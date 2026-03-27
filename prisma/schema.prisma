@@ -17,93 +17,32 @@ model Brand {
 }
 
 model Manual {
-  id            String      @id @default(cuid())
-  name          String
-  slug          String      @unique
-  pdfUrl        String?
-  imageUrl      String?
-  isBroken      Boolean     @default(false)
-  lastValidated DateTime?
-  brand         Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  brandId       String
-  faultCodes    FaultCode[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id         String      @id @default(cuid())
+  name       String
+  slug       String      @unique
+  pdfUrl     String?
+  imageUrl   String?
+  brand      Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brandId    String
+  faultCodes FaultCode[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 
   @@index([brandId])
 }
 
 model FaultCode {
-  id           String   @id @default(cuid())
-  code         String
-  slug         String   @unique
-  title        String
-  description   String
-  causes        String[]
-  fixSteps      String[]
-  sourceUrl     String?
-  sourcePage   Int?
-  translations Json     @default("{}")
-  isIndexed    Boolean  @default(false)
-  manual       Manual   @relation(fields: [manualId], references: [id], onDelete: Cascade)
-  manualId     String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(cuid())
+  code        String
+  slug        String   @unique
+  title       String
+  description String
+  fixSteps    String[]
+  manual      Manual   @relation(fields: [manualId], references: [id], onDelete: Cascade)
+  manualId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([manualId])
   @@index([code])
-}
-
-model MiningLog {
-  id         String   @id @default(cuid())
-  brand      String
-  manual     String
-  codesFound Int
-  pagesUsed  Int
-  durationMs Int
-  status     String
-  message    String?
-  createdAt  DateTime @default(now())
-
-  @@index([createdAt])
-  @@index([brand])
-}
-
-model MiningQueue {
-  id            String   @id @default(cuid())
-  brandName     String
-  status        String   @default("pending")
-  targetManuals String[] @default([])
-  createdAt     DateTime @default(now())
-
-  @@index([status])
-  @@index([createdAt])
-}
-
-model SiteSetting {
-  key   String @id
-  value String
-}
-
-model SearchLog {
-  id        String   @id @default(cuid())
-  query     String
-  results   Int      @default(0)
-  createdAt DateTime @default(now())
-
-  @@index([createdAt])
-  @@index([query])
-}
-
-model UserRequest {
-  id        String   @id @default(cuid())
-  brand     String
-  model     String?
-  email     String?
-  status    String   @default("pending")
-  voteCount Int      @default(1)
-  createdAt DateTime @default(now())
-
-  @@index([status])
-  @@index([voteCount])
 }

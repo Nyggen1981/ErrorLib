@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "npx prisma generate && next build",
-    "postinstall": "prisma generate || echo 'prisma generate skipped'",
+    "postinstall": "npx prisma generate",
     "start": "next start",
     "lint": "next lint",
     "db:migrate": "npx prisma migrate dev",
@@ -14,8 +14,7 @@
     "db:generate": "npx prisma generate",
     "db:seed": "npx tsx prisma/seed.ts",
     "process-manual": "npx tsx scripts/process-manual.ts",
-    "mine": "npx tsx scripts/auto-miner.ts",
-    "push-google": "npx tsx scripts/push-to-google.ts"
+    "mine": "npx tsx scripts/auto-miner.ts"
   },
   "keywords": [],
   "author": "",
@@ -26,30 +25,25 @@
     "@neondatabase/serverless": "^1.0.2",
     "@prisma/adapter-neon": "^7.5.0",
     "@prisma/client": "^7.5.0",
-    "googleapis": "^171.4.0",
+    "canvas": "^3.2.2",
+    "dotenv": "^17.3.1",
     "next": "^16.2.1",
-    "pdf-lib": "^1.17.1",
+    "openai": "^6.32.0",
+    "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^5.5.207",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "resend": "^6.9.4"
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
-    "dotenv": "^17.3.1",
-    "openai": "^6.32.0",
-    "pdf-parse": "^2.4.5",
-    "pdfjs-dist": "^5.5.207",
     "postcss": "^8.5.8",
     "prisma": "^7.5.0",
     "tailwindcss": "^4.2.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"
-  },
-  "optionalDependencies": {
-    "canvas": "^3.2.2",
-    "sharp": "^0.34.5"
   }
 }

@@ -5,8 +5,5 @@ node_modules
 dist
 temp_manuals
 generated/prisma
-scripts/mined-manuals.json
-scripts/.text-cache
 *.db
 *.db-journal
-public/sitemap.xml

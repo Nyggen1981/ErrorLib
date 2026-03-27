@@ -5,13 +5,13 @@ type Crumb = {
 
 export function Breadcrumbs({ items }: { items: Crumb[] }) {
   return (
-    <nav aria-label="Breadcrumb" className="mb-4">
-      <ol className="flex flex-wrap items-center gap-1 text-xs text-technical-400">
+    <nav aria-label="Breadcrumb" className="mb-6">
+      <ol className="flex flex-wrap items-center gap-1.5 text-sm text-technical-500">
         {items.map((item, i) => (
-          <li key={i} className="flex items-center gap-1">
+          <li key={i} className="flex items-center gap-1.5">
             {i > 0 && (
               <svg
-                className="h-3 w-3 text-technical-500"
+                className="h-3.5 w-3.5 text-technical-300"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth={2}
@@ -27,12 +27,12 @@ export function Breadcrumbs({ items }: { items: Crumb[] }) {
             {item.href ? (
               <a
                 href={item.href}
-                className="transition-colors hover:text-accent"
+                className="transition-colors hover:text-technical-900"
               >
                 {item.label}
               </a>
             ) : (
-              <span className="text-technical-200">
+              <span className="font-medium text-technical-900">
                 {item.label}
               </span>
             )}

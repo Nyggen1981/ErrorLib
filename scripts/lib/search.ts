@@ -9,8 +9,7 @@ export type SearchResult = {
 
 export async function searchManuals(
   brand: string,
-  maxResults = 10,
-  targetSeries?: string[]
+  maxResults = 10
 ): Promise<SearchResult[]> {
   const apiKey = process.env.SERPER_API_KEY;
   if (!apiKey) {
@@ -19,21 +18,11 @@ export async function searchManuals(
     );
   }
 
-  let queries: string[];
-
-  if (targetSeries && targetSeries.length > 0) {
-    queries = targetSeries.flatMap((series) => [
-      `${brand} ${series} fault code list PDF manual filetype:pdf`,
-      `${brand} ${series} troubleshooting error codes PDF filetype:pdf`,
-    ]);
-    log.info(`[EXPAND] Targeted search for ${targetSeries.length} series: ${targetSeries.join(", ")}`);
-  } else {
-    queries = [
-      `${brand} fault code list PDF manual English filetype:pdf`,
-      `${brand} troubleshooting guide error codes PDF English filetype:pdf`,
-      `${brand} drive diagnostic manual PDF English filetype:pdf`,
-    ];
-  }
+  const queries = [
+    `${brand} fault code list PDF manual filetype:pdf`,
+    `${brand} troubleshooting guide error codes PDF filetype:pdf`,
+    `${brand} drive diagnostic manual PDF filetype:pdf`,
+  ];
 
   const allResults: SearchResult[] = [];
   const seenUrls = new Set<string>();
@@ -106,50 +95,26 @@ export function extractManualNameFallback(title: string, brand: string): string 
 export async function extractManualName(
   title: string,
   url: string,
-  brand: string,
-  existingNames?: string[]
+  brand: string
 ): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return extractManualNameFallback(title, brand);
 
-  const existingBlock =
-    existingNames && existingNames.length > 0
-      ? `\nEXISTING MANUALS for ${brand} (use one of these if the new manual covers the same product series — return the EXACT existing string with only a different descriptor suffix if needed):\n${existingNames.map((n) => `  - "${n}"`).join("\n")}\n`
-      : "";
-
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const result = await model.generateContent(
-      `You are an industrial equipment librarian cataloguing manuals into a database. Your goal is to identify the PRIMARY MODEL NAME the manual covers, and ensure consistency with existing entries.
+      `You are naming an industrial equipment manual for a database.
 
 Given this PDF search result:
 - Brand: ${brand}
 - Search title: "${title}"
 - URL: ${url}
-${existingBlock}
-RULES (strictly follow in this order):
-1. FIRST CHECK: If this manual covers the same product series as an existing entry, you MUST reuse that model name. Add a different descriptor suffix to distinguish it (e.g., if "ABB ACS880 Standard Firmware" exists and this is the hardware manual, return "ABB ACS880 Hardware Manual"). Near-matches count — "ACS880" and "ACS 880" are the same product.
-2. Return the brand name followed by the primary product model/series name.
-3. NEVER use a part number as the model name (e.g. "A20B-2101-0390", "6SL3210-1PE21", "E84AVSCx" are part numbers — find the actual product name they belong to).
-4. NEVER use a document type as the ONLY name (e.g. "Service Bulletin", "Parameter List", "Maintenance Manual").
-5. NEVER use generic terms alone (e.g. "Connection", "Guide", "Manual", "System", "Diagnostics").
-6. If the URL or title contains a clear model series (e.g. "ACS880", "Series 30i", "VLT Micro Drive FC 51", "SINAMICS G120"), USE IT.
-7. Add a short descriptor only if it clarifies the product type (e.g. "Standard Firmware", "Servo Amplifier", "AC Servo Motor").
-8. Maximum 60 characters.
 
-Good examples:
-- "${brand} ACS580 General Purpose Drive"
-- "${brand} Series 30i CNC Controller"
-- "${brand} VLT Micro Drive FC 51"
-- "${brand} R-30iB Robot Controller"
-
-Bad examples (NEVER return these):
-- "${brand} A20B-2101-0390" (part number)
-- "${brand} Connection" (generic)
-- "${brand} Manual Guide" (document type)
-
+Return ONLY a short, clean, professional manual name. Include the brand and model number.
+Examples of good names: "ABB ACS580 General Purpose Drive", "Siemens SINAMICS G120 Variable Speed Drive", "ABB ACS800 Standard Firmware"
+Do NOT include "Manual", "PDF", "Fault Codes", file extensions, or marketing text.
 Return ONLY the name, nothing else.`
     );
 

@@ -1,6 +1,5 @@
 import { PrismaClient } from "../../generated/prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
-import { log } from "./logger.js";
 
 let _prisma: PrismaClient | null = null;
 
@@ -15,7 +14,6 @@ export function getPrisma(): PrismaClient {
 }
 
 export async function disconnect() {
-  await flushDbQueue();
   if (_prisma) {
     await _prisma.$disconnect();
     _prisma = null;
@@ -61,168 +59,20 @@ export async function upsertFaultCode(
   code: string,
   title: string,
   description: string,
-  fixSteps: string[],
-  sourceUrl?: string,
-  sourcePage?: number,
-  causes?: string[]
+  fixSteps: string[]
 ) {
   const prisma = getPrisma();
-
-  const existing = await prisma.faultCode.findFirst({
-    where: { code, manualId },
+  const slug = slugify(`${code}-${title}`);
+  return prisma.faultCode.upsert({
+    where: { slug },
+    update: { title, description, fixSteps },
+    create: {
+      code,
+      slug,
+      title,
+      description,
+      fixSteps,
+      manualId,
+    },
   });
-
-  if (existing) {
-    return prisma.faultCode.update({
-      where: { id: existing.id },
-      data: {
-        title,
-        description,
-        fixSteps,
-        ...(sourceUrl && { sourceUrl }),
-        ...(sourcePage != null && { sourcePage }),
-        ...(causes && causes.length > 0 && { causes }),
-      },
-    });
-  }
-
-  const baseSlug = slugify(`${code}-${title}`);
-  let slug = baseSlug;
-  let attempt = 0;
-
-  while (true) {
-    try {
-      return await prisma.faultCode.create({
-        data: {
-          code,
-          slug,
-          title,
-          description,
-          fixSteps,
-          manualId,
-          sourceUrl,
-          sourcePage,
-          ...(causes && causes.length > 0 && { causes }),
-        },
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("Unique constraint") && attempt < 3) {
-        attempt++;
-        slug = `${baseSlug}-${manualId.slice(-6)}-${attempt}`;
-        continue;
-      }
-      throw err;
-    }
-  }
-}
-
-export async function enrichFaultCode(
-  manualId: string,
-  code: string,
-  data: {
-    causes?: string[];
-    fixSteps?: string[];
-    description?: string;
-    sourcePage?: number;
-  }
-): Promise<boolean> {
-  const prisma = getPrisma();
-  const existing = await prisma.faultCode.findFirst({
-    where: { code, manualId },
-  });
-  if (!existing) return false;
-
-  const update: Record<string, unknown> = {};
-  if (data.causes && data.causes.length > 0) update.causes = data.causes;
-  if (data.fixSteps && data.fixSteps.length > 0) update.fixSteps = data.fixSteps;
-  if (data.description && data.description.length > existing.description.length) update.description = data.description;
-  if (data.sourcePage != null && !existing.sourcePage) update.sourcePage = data.sourcePage;
-
-  if (Object.keys(update).length === 0) return false;
-
-  update.translations = {};
-
-  await prisma.faultCode.update({ where: { id: existing.id }, data: update });
-  return true;
-}
-
-// ─── Mining Log ───
-
-export async function createMiningLog(entry: {
-  brand: string;
-  manual: string;
-  codesFound: number;
-  pagesUsed: number;
-  durationMs: number;
-  status: string;
-  message?: string;
-}) {
-  try {
-    const prisma = getPrisma();
-    await prisma.miningLog.create({ data: entry });
-    log.detail(`  [LOG] ${entry.status}: ${entry.brand} / ${entry.manual}`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log.warn(`  [LOG FAILED] Could not write mining log: ${msg.substring(0, 150)}`);
-  }
-}
-
-// ─── Background DB Queue ───
-// Queues upsert work so Gemini calls are not blocked by DB round-trips.
-
-type QueueItem = {
-  manualId: string;
-  code: string;
-  title: string;
-  description: string;
-  fixSteps: string[];
-  sourceUrl?: string;
-  sourcePage?: number;
-  causes?: string[];
-};
-
-let _queue: QueueItem[] = [];
-let _flushing: Promise<number> | null = null;
-
-export function enqueueFaultCode(item: QueueItem) {
-  _queue.push(item);
-}
-
-export async function flushDbQueue(): Promise<number> {
-  if (_flushing) await _flushing;
-
-  const items = _queue.splice(0);
-  if (items.length === 0) return 0;
-
-  _flushing = (async () => {
-    let saved = 0;
-    for (const item of items) {
-      try {
-        await upsertFaultCode(
-          item.manualId,
-          item.code,
-          item.title,
-          item.description,
-          item.fixSteps,
-          item.sourceUrl,
-          item.sourcePage,
-          item.causes
-        );
-        saved++;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        log.warn(`  DB write failed for ${item.code}: ${msg.substring(0, 100)}`);
-      }
-    }
-    return saved;
-  })();
-
-  const count = await _flushing;
-  _flushing = null;
-  return count;
-}
-
-export function queueSize(): number {
-  return _queue.length;
 }

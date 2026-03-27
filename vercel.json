@@ -1,5 +1,0 @@
-{
-  "framework": "nextjs",
-  "installCommand": "npm install --ignore-scripts && npx prisma generate",
-  "buildCommand": "next build"
-}
