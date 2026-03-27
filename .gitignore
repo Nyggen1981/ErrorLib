@@ -10,3 +10,5 @@ scripts/.text-cache
 *.db
 *.db-journal
 fault-katalog.txt
+tsconfig.tsbuildinfo
+*.tsbuildinfo
