@@ -1,28 +1,30 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
+import { getSiteUrl } from "@/lib/site-url";
 
-const BASE = "https://errorlib.net";
+/** Revalidate sitemap periodically (seconds). */
+export const revalidate = 3600;
 
-/** Longest DB work on large catalogs (Vercel / serverless). */
 export const maxDuration = 120;
 
-/** Maks URL-er pr. sitemap (Google-grense 50 000; margin). */
 const MAX_URLS_PER_SITEMAP = 45_000;
 
-type SitemapArgs = { id?: Promise<string> };
+const manualWhere = { isBroken: false };
+
+type SitemapProps = { id?: Promise<string | undefined> };
 
 export async function generateSitemaps() {
   const [brandCount, manualCount, faultCount] = await Promise.all([
     prisma.brand.count(),
-    prisma.manual.count(),
-    prisma.faultCode.count(),
+    prisma.manual.count({ where: manualWhere }),
+    prisma.faultCode.count({ where: { manual: manualWhere } }),
   ]);
 
   const staticAndNavApprox = 4 + brandCount;
   const totalApprox = staticAndNavApprox + manualCount + faultCount;
 
   if (totalApprox <= MAX_URLS_PER_SITEMAP) {
-    return [{ id: "0" }];
+    return [{ id: 0 }];
   }
 
   const brands = await prisma.brand.findMany({
@@ -30,15 +32,15 @@ export async function generateSitemaps() {
     orderBy: { slug: "asc" },
   });
 
-  return [{ id: "0" }, ...brands.map((_, i) => ({ id: String(i + 1) }))];
+  return [{ id: 0 }, ...brands.map((_, i) => ({ id: i + 1 }))];
 }
 
-function staticEntries(): MetadataRoute.Sitemap {
+function staticEntries(base: string): MetadataRoute.Sitemap {
   return [
-    { url: BASE, lastModified: new Date(), changeFrequency: "daily", priority: 1 },
-    { url: `${BASE}/about`, changeFrequency: "monthly", priority: 0.4 },
-    { url: `${BASE}/privacy`, changeFrequency: "yearly", priority: 0.2 },
-    { url: `${BASE}/terms`, changeFrequency: "yearly", priority: 0.2 },
+    { url: base, lastModified: new Date(), changeFrequency: "daily", priority: 1 },
+    { url: `${base}/about`, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${base}/privacy`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${base}/terms`, changeFrequency: "yearly", priority: 0.2 },
   ];
 }
 
@@ -47,8 +49,12 @@ async function buildLastModMaps() {
     prisma.faultCode.groupBy({
       by: ["manualId"],
       _max: { updatedAt: true },
+      where: { manual: manualWhere },
     }),
-    prisma.manual.findMany({ select: { id: true, brandId: true } }),
+    prisma.manual.findMany({
+      where: manualWhere,
+      select: { id: true, brandId: true },
+    }),
   ]);
 
   const manualToBrand = new Map(manualsMini.map((m) => [m.id, m.brandId]));
@@ -72,15 +78,19 @@ async function buildLastModMaps() {
 }
 
 export default async function sitemap(
-  props: SitemapArgs
+  props: SitemapProps
 ): Promise<MetadataRoute.Sitemap> {
-  const idRaw = props.id != null ? await props.id : "0";
-  const shard = Number(idRaw);
+  const base = getSiteUrl();
+  const idRaw = props.id != null ? await props.id : undefined;
+  const shard =
+    idRaw === undefined || idRaw === ""
+      ? 0
+      : Number.parseInt(String(idRaw).replace(/\.xml$/i, ""), 10);
 
   const [brands, manualCount, faultCount, maps] = await Promise.all([
     prisma.brand.findMany({ orderBy: { slug: "asc" } }),
-    prisma.manual.count(),
-    prisma.faultCode.count(),
+    prisma.manual.count({ where: manualWhere }),
+    prisma.faultCode.count({ where: { manual: manualWhere } }),
     buildLastModMaps(),
   ]);
 
@@ -89,19 +99,25 @@ export default async function sitemap(
   const totalApprox = staticAndNavApprox + manualCount + faultCount;
   const useShards = totalApprox > MAX_URLS_PER_SITEMAP;
 
-  if (!useShards) {
-    const manuals = await prisma.manual.findMany({
-      include: { brand: { select: { slug: true } } },
-      orderBy: [{ brandId: "asc" }, { slug: "asc" }],
-    });
-    const faultCodes = await prisma.faultCode.findMany({
-      include: {
-        manual: { include: { brand: { select: { slug: true } } } },
-      },
-      orderBy: [{ manualId: "asc" }, { code: "asc" }],
-    });
+  const manualQuery = {
+    where: manualWhere,
+    include: { brand: { select: { slug: true } } },
+    orderBy: [{ brandId: "asc" as const }, { slug: "asc" as const }],
+  };
 
-    const entries: MetadataRoute.Sitemap = [...staticEntries()];
+  const faultQuery = {
+    where: { manual: manualWhere },
+    include: {
+      manual: { include: { brand: { select: { slug: true } } } },
+    },
+    orderBy: [{ manualId: "asc" as const }, { code: "asc" as const }],
+  };
+
+  if (!useShards) {
+    const manuals = await prisma.manual.findMany(manualQuery);
+    const faultCodes = await prisma.faultCode.findMany(faultQuery);
+
+    const entries: MetadataRoute.Sitemap = [...staticEntries(base)];
 
     for (const b of brands) {
       const faultMax = faultMaxTimeByBrand.get(b.id);
@@ -110,7 +126,7 @@ export default async function sitemap(
           ? new Date(Math.max(b.updatedAt.getTime(), faultMax))
           : b.updatedAt;
       entries.push({
-        url: `${BASE}/${b.slug}`,
+        url: `${base}/${b.slug}`,
         lastModified,
         changeFrequency: "weekly",
         priority: 0.8,
@@ -124,7 +140,7 @@ export default async function sitemap(
           ? new Date(Math.max(m.updatedAt.getTime(), faultMax))
           : m.updatedAt;
       entries.push({
-        url: `${BASE}/${m.brand.slug}/${m.slug}`,
+        url: `${base}/${m.brand.slug}/${m.slug}`,
         lastModified,
         changeFrequency: "weekly",
         priority: 0.7,
@@ -133,7 +149,7 @@ export default async function sitemap(
 
     for (const fc of faultCodes) {
       entries.push({
-        url: `${BASE}/${fc.manual.brand.slug}/${fc.manual.slug}/${fc.slug}`,
+        url: `${base}/${fc.manual.brand.slug}/${fc.manual.slug}/${fc.slug}`,
         lastModified: fc.updatedAt,
         changeFrequency: "monthly",
         priority: 0.6,
@@ -144,12 +160,9 @@ export default async function sitemap(
   }
 
   if (shard === 0) {
-    const manuals = await prisma.manual.findMany({
-      include: { brand: { select: { slug: true } } },
-      orderBy: [{ brandId: "asc" }, { slug: "asc" }],
-    });
+    const manuals = await prisma.manual.findMany(manualQuery);
 
-    const entries: MetadataRoute.Sitemap = [...staticEntries()];
+    const entries: MetadataRoute.Sitemap = [...staticEntries(base)];
 
     for (const b of brands) {
       const faultMax = faultMaxTimeByBrand.get(b.id);
@@ -158,7 +171,7 @@ export default async function sitemap(
           ? new Date(Math.max(b.updatedAt.getTime(), faultMax))
           : b.updatedAt;
       entries.push({
-        url: `${BASE}/${b.slug}`,
+        url: `${base}/${b.slug}`,
         lastModified,
         changeFrequency: "weekly",
         priority: 0.8,
@@ -172,7 +185,7 @@ export default async function sitemap(
           ? new Date(Math.max(m.updatedAt.getTime(), faultMax))
           : m.updatedAt;
       entries.push({
-        url: `${BASE}/${m.brand.slug}/${m.slug}`,
+        url: `${base}/${m.brand.slug}/${m.slug}`,
         lastModified,
         changeFrequency: "weekly",
         priority: 0.7,
@@ -186,7 +199,7 @@ export default async function sitemap(
   if (!brand) return [];
 
   const faultCodes = await prisma.faultCode.findMany({
-    where: { manual: { brandId: brand.id } },
+    where: { manual: { isBroken: false, brandId: brand.id } },
     include: {
       manual: { include: { brand: { select: { slug: true } } } },
     },
@@ -194,7 +207,7 @@ export default async function sitemap(
   });
 
   return faultCodes.map((fc) => ({
-    url: `${BASE}/${fc.manual.brand.slug}/${fc.manual.slug}/${fc.slug}`,
+    url: `${base}/${fc.manual.brand.slug}/${fc.manual.slug}/${fc.slug}`,
     lastModified: fc.updatedAt,
     changeFrequency: "monthly" as const,
     priority: 0.6,
