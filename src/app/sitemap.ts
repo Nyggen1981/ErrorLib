@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
-import { getSiteUrl } from "@/lib/site-url";
+import { CANONICAL_SITE_ORIGIN } from "@/lib/site-url";
 
 /**
  * Single sitemap at /sitemap.xml (do not use generateSitemaps() here: with that
@@ -58,7 +58,7 @@ async function buildLastModMaps() {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = getSiteUrl();
+  const base = CANONICAL_SITE_ORIGIN;
   const [brands, maps] = await Promise.all([
     prisma.brand.findMany({ orderBy: { slug: "asc" } }),
     buildLastModMaps(),
