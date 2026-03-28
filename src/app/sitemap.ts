@@ -2,38 +2,19 @@ import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
 import { getSiteUrl } from "@/lib/site-url";
 
-/** Revalidate sitemap periodically (seconds). */
+/**
+ * Single sitemap at /sitemap.xml (do not use generateSitemaps() here: with that
+ * export, Next only serves shard URLs under /sitemap/[id].xml and /sitemap.xml
+ * for the index can 404 when the route params do not match).
+ */
 export const revalidate = 3600;
 
 export const maxDuration = 120;
 
-const MAX_URLS_PER_SITEMAP = 45_000;
+/** Google max URLs per sitemap file; cap if catalog grows huge. */
+const MAX_URLS = 45_000;
 
 const manualWhere = { isBroken: false };
-
-type SitemapProps = { id?: Promise<string | undefined> };
-
-export async function generateSitemaps() {
-  const [brandCount, manualCount, faultCount] = await Promise.all([
-    prisma.brand.count(),
-    prisma.manual.count({ where: manualWhere }),
-    prisma.faultCode.count({ where: { manual: manualWhere } }),
-  ]);
-
-  const staticAndNavApprox = 4 + brandCount;
-  const totalApprox = staticAndNavApprox + manualCount + faultCount;
-
-  if (totalApprox <= MAX_URLS_PER_SITEMAP) {
-    return [{ id: 0 }];
-  }
-
-  const brands = await prisma.brand.findMany({
-    select: { id: true },
-    orderBy: { slug: "asc" },
-  });
-
-  return [{ id: 0 }, ...brands.map((_, i) => ({ id: i + 1 }))];
-}
 
 function staticEntries(base: string): MetadataRoute.Sitemap {
   return [
@@ -58,7 +39,6 @@ async function buildLastModMaps() {
   ]);
 
   const manualToBrand = new Map(manualsMini.map((m) => [m.id, m.brandId]));
-
   const faultMaxTimeByManual = new Map<string, number>();
   const faultMaxTimeByBrand = new Map<string, number>();
 
@@ -77,139 +57,70 @@ async function buildLastModMaps() {
   return { faultMaxTimeByManual, faultMaxTimeByBrand };
 }
 
-export default async function sitemap(
-  props: SitemapProps
-): Promise<MetadataRoute.Sitemap> {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = getSiteUrl();
-  const idRaw = props.id != null ? await props.id : undefined;
-  const shard =
-    idRaw === undefined || idRaw === ""
-      ? 0
-      : Number.parseInt(String(idRaw).replace(/\.xml$/i, ""), 10);
-
-  const [brands, manualCount, faultCount, maps] = await Promise.all([
+  const [brands, maps] = await Promise.all([
     prisma.brand.findMany({ orderBy: { slug: "asc" } }),
-    prisma.manual.count({ where: manualWhere }),
-    prisma.faultCode.count({ where: { manual: manualWhere } }),
     buildLastModMaps(),
   ]);
-
   const { faultMaxTimeByManual, faultMaxTimeByBrand } = maps;
-  const staticAndNavApprox = 4 + brands.length;
-  const totalApprox = staticAndNavApprox + manualCount + faultCount;
-  const useShards = totalApprox > MAX_URLS_PER_SITEMAP;
 
-  const manualQuery = {
+  const manuals = await prisma.manual.findMany({
     where: manualWhere,
     include: { brand: { select: { slug: true } } },
-    orderBy: [{ brandId: "asc" as const }, { slug: "asc" as const }],
-  };
-
-  const faultQuery = {
-    where: { manual: manualWhere },
-    include: {
-      manual: { include: { brand: { select: { slug: true } } } },
-    },
-    orderBy: [{ manualId: "asc" as const }, { code: "asc" as const }],
-  };
-
-  if (!useShards) {
-    const manuals = await prisma.manual.findMany(manualQuery);
-    const faultCodes = await prisma.faultCode.findMany(faultQuery);
-
-    const entries: MetadataRoute.Sitemap = [...staticEntries(base)];
-
-    for (const b of brands) {
-      const faultMax = faultMaxTimeByBrand.get(b.id);
-      const lastModified =
-        faultMax != null
-          ? new Date(Math.max(b.updatedAt.getTime(), faultMax))
-          : b.updatedAt;
-      entries.push({
-        url: `${base}/${b.slug}`,
-        lastModified,
-        changeFrequency: "weekly",
-        priority: 0.8,
-      });
-    }
-
-    for (const m of manuals) {
-      const faultMax = faultMaxTimeByManual.get(m.id);
-      const lastModified =
-        faultMax != null
-          ? new Date(Math.max(m.updatedAt.getTime(), faultMax))
-          : m.updatedAt;
-      entries.push({
-        url: `${base}/${m.brand.slug}/${m.slug}`,
-        lastModified,
-        changeFrequency: "weekly",
-        priority: 0.7,
-      });
-    }
-
-    for (const fc of faultCodes) {
-      entries.push({
-        url: `${base}/${fc.manual.brand.slug}/${fc.manual.slug}/${fc.slug}`,
-        lastModified: fc.updatedAt,
-        changeFrequency: "monthly",
-        priority: 0.6,
-      });
-    }
-
-    return entries;
-  }
-
-  if (shard === 0) {
-    const manuals = await prisma.manual.findMany(manualQuery);
-
-    const entries: MetadataRoute.Sitemap = [...staticEntries(base)];
-
-    for (const b of brands) {
-      const faultMax = faultMaxTimeByBrand.get(b.id);
-      const lastModified =
-        faultMax != null
-          ? new Date(Math.max(b.updatedAt.getTime(), faultMax))
-          : b.updatedAt;
-      entries.push({
-        url: `${base}/${b.slug}`,
-        lastModified,
-        changeFrequency: "weekly",
-        priority: 0.8,
-      });
-    }
-
-    for (const m of manuals) {
-      const faultMax = faultMaxTimeByManual.get(m.id);
-      const lastModified =
-        faultMax != null
-          ? new Date(Math.max(m.updatedAt.getTime(), faultMax))
-          : m.updatedAt;
-      entries.push({
-        url: `${base}/${m.brand.slug}/${m.slug}`,
-        lastModified,
-        changeFrequency: "weekly",
-        priority: 0.7,
-      });
-    }
-
-    return entries;
-  }
-
-  const brand = brands[shard - 1];
-  if (!brand) return [];
+    orderBy: [{ brandId: "asc" }, { slug: "asc" }],
+  });
 
   const faultCodes = await prisma.faultCode.findMany({
-    where: { manual: { isBroken: false, brandId: brand.id } },
+    where: { manual: manualWhere },
     include: {
       manual: { include: { brand: { select: { slug: true } } } },
     },
     orderBy: [{ manualId: "asc" }, { code: "asc" }],
   });
 
-  return faultCodes.map((fc) => ({
-    url: `${base}/${fc.manual.brand.slug}/${fc.manual.slug}/${fc.slug}`,
-    lastModified: fc.updatedAt,
-    changeFrequency: "monthly" as const,
-    priority: 0.6,
-  }));
+  const entries: MetadataRoute.Sitemap = [...staticEntries(base)];
+
+  for (const b of brands) {
+    const faultMax = faultMaxTimeByBrand.get(b.id);
+    const lastModified =
+      faultMax != null
+        ? new Date(Math.max(b.updatedAt.getTime(), faultMax))
+        : b.updatedAt;
+    entries.push({
+      url: `${base}/${b.slug}`,
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    });
+  }
+
+  for (const m of manuals) {
+    const faultMax = faultMaxTimeByManual.get(m.id);
+    const lastModified =
+      faultMax != null
+        ? new Date(Math.max(m.updatedAt.getTime(), faultMax))
+        : m.updatedAt;
+    entries.push({
+      url: `${base}/${m.brand.slug}/${m.slug}`,
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    });
+  }
+
+  for (const fc of faultCodes) {
+    entries.push({
+      url: `${base}/${fc.manual.brand.slug}/${fc.manual.slug}/${fc.slug}`,
+      lastModified: fc.updatedAt,
+      changeFrequency: "monthly",
+      priority: 0.6,
+    });
+  }
+
+  if (entries.length > MAX_URLS) {
+    return entries.slice(0, MAX_URLS);
+  }
+
+  return entries;
 }
