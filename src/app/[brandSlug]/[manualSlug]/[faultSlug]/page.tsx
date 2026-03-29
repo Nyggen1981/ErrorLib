@@ -50,8 +50,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {};
 
   const brand = fault.manual.brand.name;
-  const title = buildFaultSeoTitle(brand, fault.code, fault.title);
-  const description = buildFaultMetaDescription(brand, fault.code);
+  const title = buildFaultSeoTitle(brand, fault.code, fault.slug);
+  const description = buildFaultMetaDescription(brand, fault.code, fault.slug);
   const path = `/${fault.manual.brand.slug}/${fault.manual.slug}/${fault.slug}`;
   const url = `${CANONICAL_SITE_ORIGIN}${path}`;
   return {
@@ -115,7 +115,7 @@ export default async function FaultCodePage({ params }: Props) {
 
   const brandName = fault.manual.brand.name;
   const pageUrl = `${CANONICAL_SITE_ORIGIN}/${fault.manual.brand.slug}/${fault.manual.slug}/${fault.slug}`;
-  const seoTitle = buildFaultSeoTitle(brandName, fault.code, fault.title);
+  const seoTitle = buildFaultSeoTitle(brandName, fault.code, fault.slug);
 
   const howToSchema = {
     "@context": "https://schema.org",
