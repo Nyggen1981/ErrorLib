@@ -10,7 +10,6 @@ import {
   TranslatingBanner,
 } from "@/components/FaultCodeContent";
 import { AdSlot } from "@/components/AdSlot";
-import { QuickFixBanner } from "@/components/QuickFixBanner";
 import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
 import { buildFaultMetaDescription, buildFaultSeoTitle } from "@/lib/fault-seo";
@@ -201,7 +200,6 @@ export default async function FaultCodePage({ params }: Props) {
           fallback={englishContent}
           cached={cachedTranslation}
         >
-          <QuickFixBanner faultCode={fault.code} brandName={brandName} locale={locale} />
           <Breadcrumbs
             items={[
               { label: t("home", locale), href: "/" },
