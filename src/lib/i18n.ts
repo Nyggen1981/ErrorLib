@@ -182,6 +182,13 @@ const dict = {
     es: "Fallas relacionadas",
   },
   translating: { en: "Translating...", no: "Oversetter...", de: "Übersetzen...", es: "Traduciendo..." },
+  quickFixLabel: { en: "Quick fix", no: "Rask løsning", de: "Schnelle Hilfe", es: "Solución rápida" },
+  quickFixBody: {
+    en: "Most common cause for {code}: {cause}. Try resetting the {brand} unit first.",
+    no: "Vanligste årsak til {code}: {cause}. Prøv å tilbakestille {brand}-enheten først.",
+    de: "Häufigste Ursache für {code}: {cause}. Setzen Sie zuerst das {brand}-Gerät zurück.",
+    es: "Causa más frecuente de {code}: {cause}. Intente reiniciar primero la unidad {brand}.",
+  },
 
   // ─── Brand page ───
   modelFamilies: { en: "model families", no: "modellfamilier", de: "Modellfamilien", es: "familias de modelos" },

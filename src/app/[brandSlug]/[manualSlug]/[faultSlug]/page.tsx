@@ -10,8 +10,11 @@ import {
   TranslatingBanner,
 } from "@/components/FaultCodeContent";
 import { AdSlot } from "@/components/AdSlot";
+import { QuickFixBanner } from "@/components/QuickFixBanner";
 import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
+import { buildFaultMetaDescription, buildFaultSeoTitle } from "@/lib/fault-seo";
+import { CANONICAL_SITE_ORIGIN } from "@/lib/site-url";
 import type { Metadata } from "next";
 
 /**
@@ -48,19 +51,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {};
 
   const brand = fault.manual.brand.name;
-  const display = stripBrand(fault.manual.name, brand);
-  const title = `${brand} Error ${fault.code}: ${fault.title} — Troubleshooting Guide`;
-  const description = `Find causes and solutions for ${brand} fault code ${fault.code}. Expert technical reference for industrial automation. ${fault.description.slice(0, 100)}`;
-  const url = `/${fault.manual.brand.slug}/${fault.manual.slug}/${fault.slug}`;
+  const title = buildFaultSeoTitle(brand, fault.code, fault.title);
+  const description = buildFaultMetaDescription(brand, fault.code);
+  const path = `/${fault.manual.brand.slug}/${fault.manual.slug}/${fault.slug}`;
+  const url = `${CANONICAL_SITE_ORIGIN}${path}`;
   return {
     title,
     description,
-    alternates: { canonical: url },
+    alternates: { canonical: path },
     openGraph: {
       title,
       description,
       type: "article",
       url,
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
     },
   };
 }
@@ -107,12 +115,13 @@ export default async function FaultCodePage({ params }: Props) {
     : null;
 
   const brandName = fault.manual.brand.name;
-  const pageUrl = `https://errorlib.net/${fault.manual.brand.slug}/${fault.manual.slug}/${fault.slug}`;
+  const pageUrl = `${CANONICAL_SITE_ORIGIN}/${fault.manual.brand.slug}/${fault.manual.slug}/${fault.slug}`;
+  const seoTitle = buildFaultSeoTitle(brandName, fault.code, fault.title);
 
   const howToSchema = {
     "@context": "https://schema.org",
     "@type": "HowTo",
-    name: `How to fix ${brandName} ${fault.code}: ${fault.title}`,
+    name: seoTitle,
     description: fault.description,
     step: fault.fixSteps.map((step, i) => ({
       "@type": "HowToStep",
@@ -124,7 +133,7 @@ export default async function FaultCodePage({ params }: Props) {
   const articleSchema = {
     "@context": "https://schema.org",
     "@type": "TechArticle",
-    headline: `${brandName} Error ${fault.code}: ${fault.title}`,
+    headline: seoTitle,
     description: fault.description,
     url: pageUrl,
     publisher: {
@@ -192,6 +201,7 @@ export default async function FaultCodePage({ params }: Props) {
           fallback={englishContent}
           cached={cachedTranslation}
         >
+          <QuickFixBanner faultCode={fault.code} brandName={brandName} locale={locale} />
           <Breadcrumbs
             items={[
               { label: t("home", locale), href: "/" },
